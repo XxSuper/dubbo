@@ -134,8 +134,10 @@ public class ConfigUtils {
             if (value == null) {
                 value = "";
             }
+            // 将当前匹配的子字符串替换为指定的字符串，并且将替换后的字符串及其之前到上次匹配的子字符串之后的字符串添加到一个StringBuffer对象中
             matcher.appendReplacement(sb, Matcher.quoteReplacement(value));
         }
+        // 将最后一次匹配之后的字符串添加到一个StringBuffer对象中
         matcher.appendTail(sb);
         return sb.toString();
     }
@@ -144,13 +146,16 @@ public class ConfigUtils {
         if (PROPERTIES == null) {
             synchronized (ConfigUtils.class) {
                 if (PROPERTIES == null) {
+                    // 是获取系统的相关属性
                     String path = System.getProperty(Constants.DUBBO_PROPERTIES_KEY);
                     if (path == null || path.length() == 0) {
+                        // 获取指定的环境变量的值
                         path = System.getenv(Constants.DUBBO_PROPERTIES_KEY);
                         if (path == null || path.length() == 0) {
                             path = Constants.DEFAULT_DUBBO_PROPERTIES;
                         }
                     }
+                    // 加载 properties文件
                     PROPERTIES = ConfigUtils.loadProperties(path, false, true);
                 }
             }
