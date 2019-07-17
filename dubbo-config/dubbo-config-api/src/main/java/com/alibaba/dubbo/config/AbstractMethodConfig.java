@@ -38,6 +38,7 @@ public abstract class AbstractMethodConfig extends AbstractConfig {
     protected Integer retries;
 
     // max concurrent invocations
+    // 每服务消费者每服务每方法最大并发调用数
     protected Integer actives;
 
     // load balance
@@ -50,12 +51,14 @@ public abstract class AbstractMethodConfig extends AbstractConfig {
     protected Boolean sent;
 
     // the name of mock class which gets called when a service fails to execute
+    // 服务接口调用失败Mock实现类名，该Mock类必须有一个无参构造函数，与Local的区别在于，Local总是被执行，而Mock只在出现非业务异常(比如超时，网络异常等)时执行，Local在远程调用之前执行，Mock在远程调用后执行。
     protected String mock;
 
     // merger
     protected String merger;
 
     // cache
+    // 以调用参数为key，缓存返回结果，可选：lru, threadlocal, jcache等
     protected String cache;
 
     // validation

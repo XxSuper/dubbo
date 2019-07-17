@@ -56,18 +56,22 @@ public abstract class AbstractInterfaceConfig extends AbstractMethodConfig {
     protected String local;
 
     // local stub class name for the service interface
+    // 服务接口客户端本地代理类名，用于在客户端执行本地逻辑，如本地缓存等，该本地代理类的构造函数必须允许传入远程代理对象，构造函数如：public XxxServiceLocal(XxxService xxxService)
     protected String stub;
 
     // service monitor
     protected MonitorConfig monitor;
 
     // proxy type
+    // 选择动态代理实现策略，可选：javassist, jdk
     protected String proxy;
 
     // cluster type
+    // 集群方式，可选：failover/failfast/failsafe/failback/forking
     protected String cluster;
 
     // filter
+    // 服务消费方远程调用过程拦截器名称，多个名称用逗号分隔
     protected String filter;
 
     // listener
@@ -81,6 +85,7 @@ public abstract class AbstractInterfaceConfig extends AbstractMethodConfig {
     protected Integer connections;
 
     // layer
+    // 服务调用者所在的分层。如：biz、dao、intl:web、china:acton。
     protected String layer;
 
     // application info
