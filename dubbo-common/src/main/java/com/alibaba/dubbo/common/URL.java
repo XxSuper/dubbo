@@ -74,7 +74,7 @@ public final class URL implements Serializable {
 
     /**
      * 协议名
-     */
+     *//**/
     private final String protocol;
 
     /**
