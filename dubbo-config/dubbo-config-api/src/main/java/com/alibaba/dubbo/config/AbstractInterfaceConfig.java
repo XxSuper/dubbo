@@ -75,6 +75,7 @@ public abstract class AbstractInterfaceConfig extends AbstractMethodConfig {
     protected String filter;
 
     // listener
+    // 服务消费方引用服务监听器名称，多个名称用逗号分隔
     protected String listener;
 
     // owner
@@ -82,6 +83,7 @@ public abstract class AbstractInterfaceConfig extends AbstractMethodConfig {
 
     // connection limits, 0 means shared connection, otherwise it defines the connections delegated to the
     // current service
+    // 每个服务对每个提供者的最大连接数，rmi、http、hessian等短连接协议支持此配置，dubbo协议长连接不支持此配置
     protected Integer connections;
 
     // layer
@@ -317,10 +319,11 @@ public abstract class AbstractInterfaceConfig extends AbstractMethodConfig {
     }
 
     void checkMock(Class<?> interfaceClass) {
+        // mock 为空直接return
         if (ConfigUtils.isEmpty(mock)) {
             return;
         }
-
+        // 获取标准化的mock服务名称
         String normalizedMock = MockInvoker.normalizeMock(mock);
         if (normalizedMock.startsWith(Constants.RETURN_PREFIX)) {
             normalizedMock = normalizedMock.substring(Constants.RETURN_PREFIX.length()).trim();
@@ -341,13 +344,16 @@ public abstract class AbstractInterfaceConfig extends AbstractMethodConfig {
                 }
             }
         } else {
+            // 获取mock服务实例
             MockInvoker.getMockObject(normalizedMock, interfaceClass);
         }
     }
 
     void checkStub(Class<?> interfaceClass) {
         if (ConfigUtils.isNotEmpty(local)) {
+            // local不为空，并且是默认的，取 接口名+local 加载，如果不为默认取 local 作为类名加载
             Class<?> localClass = ConfigUtils.isDefault(local) ? ReflectUtils.forName(interfaceClass.getName() + "Local") : ReflectUtils.forName(local);
+            // interfaceClass 是否为 localClass类的父类
             if (!interfaceClass.isAssignableFrom(localClass)) {
                 throw new IllegalStateException("The local implementation class " + localClass.getName() + " not implement interface " + interfaceClass.getName());
             }
@@ -358,7 +364,9 @@ public abstract class AbstractInterfaceConfig extends AbstractMethodConfig {
             }
         }
         if (ConfigUtils.isNotEmpty(stub)) {
+            // stub不为空，并且是默认的，取 接口名+stub 加载，如果不为默认取 stub 作为类名加载
             Class<?> localClass = ConfigUtils.isDefault(stub) ? ReflectUtils.forName(interfaceClass.getName() + "Stub") : ReflectUtils.forName(stub);
+            // interfaceClass 是否为 localClass类的父类
             if (!interfaceClass.isAssignableFrom(localClass)) {
                 throw new IllegalStateException("The local implementation class " + localClass.getName() + " not implement interface " + interfaceClass.getName());
             }

@@ -223,8 +223,10 @@ public class ConfigUtils {
      */
     public static Properties loadProperties(String fileName, boolean allowMultiFile, boolean optional) {
         Properties properties = new Properties();
+        // 检查文件是否存在
         if (checkFileNameExist(fileName)) {
             try {
+                // 加载配置文件
                 FileInputStream input = new FileInputStream(fileName);
                 try {
                     properties.load(input);
@@ -239,6 +241,7 @@ public class ConfigUtils {
 
         List<java.net.URL> list = new ArrayList<java.net.URL>();
         try {
+            // 从classpath根下获取fileName文件
             Enumeration<java.net.URL> urls = ClassHelper.getClassLoader().getResources(fileName);
             list = new ArrayList<java.net.URL>();
             while (urls.hasMoreElements()) {
@@ -273,7 +276,7 @@ public class ConfigUtils {
         }
 
         logger.info("load " + fileName + " properties file from " + list);
-
+        // 加载配置文件
         for (java.net.URL url : list) {
             try {
                 Properties p = new Properties();
@@ -310,6 +313,7 @@ public class ConfigUtils {
     public static int getPid() {
         if (PID < 0) {
             try {
+                // RuntimeMXBean是Java虚拟机的运行时系统的管理接口。使用它可以获取正在运行的 Java 虚拟机等信息，包括获取PID
                 RuntimeMXBean runtime = ManagementFactory.getRuntimeMXBean();
                 String name = runtime.getName(); // format: "pid@hostname"
                 PID = Integer.parseInt(name.substring(0, name.indexOf('@')));

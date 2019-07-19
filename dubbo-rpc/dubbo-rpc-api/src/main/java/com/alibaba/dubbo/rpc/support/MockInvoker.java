@@ -163,11 +163,13 @@ final public class MockInvoker<T> implements Invoker<T> {
     }
 
     @SuppressWarnings("unchecked")
+    // 获取mock对象
     public static Object getMockObject(String mockService, Class serviceType) {
+        // mockservice 是否默认
         if (ConfigUtils.isDefault(mockService)) {
             mockService = serviceType.getName() + "Mock";
         }
-
+        // 获取mockService的class对象，并检验是否为serviceType的子类
         Class<?> mockClass = ReflectUtils.forName(mockService);
         if (!serviceType.isAssignableFrom(mockClass)) {
             throw new IllegalStateException("The mock class " + mockClass.getName() +
@@ -175,6 +177,7 @@ final public class MockInvoker<T> implements Invoker<T> {
         }
 
         try {
+            // 获取mock服务实例
             return mockClass.newInstance();
         } catch (InstantiationException e) {
             throw new IllegalStateException("No default constructor from mock class " + mockClass.getName(), e);

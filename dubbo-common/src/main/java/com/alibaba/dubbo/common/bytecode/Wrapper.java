@@ -101,7 +101,7 @@ public abstract class Wrapper {
 
         if (c == Object.class)
             return OBJECT_WRAPPER;
-
+        // 从Wrapper_Map缓存中获取
         Wrapper ret = WRAPPER_MAP.get(c);
         if (ret == null) {
             ret = makeWrapper(c);
@@ -111,10 +111,12 @@ public abstract class Wrapper {
     }
 
     private static Wrapper makeWrapper(Class<?> c) {
+        // c是否为基本数据类型
         if (c.isPrimitive())
             throw new IllegalArgumentException("Can not create wrapper for primitive type: " + c);
-
+        // 获取类名
         String name = c.getName();
+        // 获取当前现成的classloader
         ClassLoader cl = ClassHelper.getClassLoader(c);
 
         StringBuilder c1 = new StringBuilder("public void setPropertyValue(Object o, String n, Object v){ ");

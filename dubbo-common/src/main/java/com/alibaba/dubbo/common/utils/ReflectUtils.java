@@ -821,11 +821,14 @@ public final class ReflectUtils {
     public static Constructor<?> findConstructor(Class<?> clazz, Class<?> paramType) throws NoSuchMethodException {
         Constructor<?> targetConstructor;
         try {
+            // 匹配和paramType参数配型相符的构造函数
             targetConstructor = clazz.getConstructor(new Class<?>[]{paramType});
         } catch (NoSuchMethodException e) {
             targetConstructor = null;
+            // 返回一个包含某些Constructor对象反映此Class对象所表示的类所有公共构造函数的数组
             Constructor<?>[] constructors = clazz.getConstructors();
             for (Constructor<?> constructor : constructors) {
+                // 构造函数是public的，参数为1个并且入参是一个超类或超接口
                 if (Modifier.isPublic(constructor.getModifiers())
                         && constructor.getParameterTypes().length == 1
                         && constructor.getParameterTypes()[0].isAssignableFrom(paramType)) {

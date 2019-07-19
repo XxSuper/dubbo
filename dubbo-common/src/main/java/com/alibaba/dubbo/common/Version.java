@@ -124,7 +124,7 @@ public final class Version {
     public static String getVersion(Class<?> cls, String defaultVersion) {
         try {
             // find version info from MANIFEST.MF first
-            // 返回这个类实现的版本
+            // 返回这个类MANIFEST.MF中的版本信息
             String version = cls.getPackage().getImplementationVersion();
             if (version == null || version.length() == 0) {
                 // 返回这个包实现该规范的版本号

@@ -188,7 +188,9 @@ public class NetUtils {
     private static InetAddress getLocalAddress0() {
         InetAddress localAddress = null;
         try {
+            // 获取本地地址
             localAddress = InetAddress.getLocalHost();
+            // 是否为有效的地址
             if (isValidAddress(localAddress)) {
                 return localAddress;
             }
@@ -196,6 +198,7 @@ public class NetUtils {
             logger.warn(e);
         }
         try {
+            // 使用 NetworkInterface 获得本机在局域网内的 IP 地址
             Enumeration<NetworkInterface> interfaces = NetworkInterface.getNetworkInterfaces();
             if (interfaces != null) {
                 while (interfaces.hasMoreElements()) {
