@@ -29,6 +29,7 @@ public interface Invoker<T> extends Node {
 
     /**
      * get service interface.
+     * 获得 Service 接口
      *
      * @return service interface.
      */
@@ -36,6 +37,7 @@ public interface Invoker<T> extends Node {
 
     /**
      * invoke.
+     * 调用方法
      *
      * @param invocation
      * @return result
