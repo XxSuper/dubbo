@@ -20,12 +20,15 @@ import com.alibaba.dubbo.common.extension.SPI;
 
 /**
  * InvokerListener. (SPI, Singleton, ThreadSafe)
+ * Invoker 监听器
  */
 @SPI
 public interface InvokerListener {
 
     /**
      * The invoker referred
+     *
+     * 当服务引用完成
      *
      * @param invoker
      * @throws RpcException
@@ -35,6 +38,8 @@ public interface InvokerListener {
 
     /**
      * The invoker destroyed.
+     *
+     * 当服务销毁引用完成
      *
      * @param invoker
      * @see com.alibaba.dubbo.rpc.Invoker#destroy()

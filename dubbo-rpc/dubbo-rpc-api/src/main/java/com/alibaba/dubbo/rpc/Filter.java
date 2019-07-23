@@ -20,6 +20,7 @@ import com.alibaba.dubbo.common.extension.SPI;
 
 /**
  * Filter. (SPI, Singleton, ThreadSafe)
+ * 过滤器接口
  */
 @SPI
 public interface Filter {
@@ -33,6 +34,7 @@ public interface Filter {
      * // after filter
      * return result;
      * </code>
+     * 执行 Invoker 的过滤逻辑
      *
      * @param invoker    service
      * @param invocation invocation.
