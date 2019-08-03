@@ -187,6 +187,7 @@ public final class URL implements Serializable {
         } else {
             parameters = new HashMap<String, String>(parameters);
         }
+        // 将为其返回一个不可修改视图的映射
         this.parameters = Collections.unmodifiableMap(parameters);
     }
 

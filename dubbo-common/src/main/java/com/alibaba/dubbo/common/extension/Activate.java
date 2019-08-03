@@ -35,6 +35,8 @@ import java.lang.annotation.Target;
  * SPI provider can call {@link ExtensionLoader#getActivateExtension(URL, String, String)} to find out all activated
  * extensions with the given criteria.
  *
+ * 自动激活条件的标记
+ *
  * @see SPI
  * @see URL
  * @see ExtensionLoader
@@ -50,6 +52,13 @@ public @interface Activate {
      * @return group names to match
      * @see ExtensionLoader#getActivateExtension(URL, String, String)
      */
+    /**
+     * Group过滤条件。
+     * <br />
+     * 包含{@link ExtensionLoader#getActivateExtension}的group参数给的值，则返回扩展。
+     * <br />
+     * 如没有Group设置，则不过滤。
+     */
     String[] group() default {};
 
     /**
@@ -63,12 +72,24 @@ public @interface Activate {
      * @see ExtensionLoader#getActivateExtension(URL, String)
      * @see ExtensionLoader#getActivateExtension(URL, String, String)
      */
+    /**
+     * Key过滤条件。包含{@link ExtensionLoader#getActivateExtension}的URL的参数Key中有，则返回扩展。
+     * <p/>
+     * 示例：<br/>
+     * 注解的值 <code>@Activate("cache,validatioin")</code>，
+     * 则{@link ExtensionLoader#getActivateExtension}的URL的参数有<code>cache</code>Key，或是<code>validatioin</code>则返回扩展。
+     * <br/>
+     * 如没有设置，则不过滤。
+     */
     String[] value() default {};
 
     /**
      * Relative ordering info, optional
      *
      * @return extension list which should be put before the current one
+     */
+    /**
+     * 排序信息，可以不提供。
      */
     String[] before() default {};
 
@@ -77,12 +98,18 @@ public @interface Activate {
      *
      * @return extension list which should be put after the current one
      */
+    /**
+     * 排序信息，可以不提供。
+     */
     String[] after() default {};
 
     /**
      * Absolute ordering info, optional
      *
      * @return absolute ordering info
+     */
+    /**
+     * 排序信息，可以不提供。
      */
     int order() default 0;
 }
