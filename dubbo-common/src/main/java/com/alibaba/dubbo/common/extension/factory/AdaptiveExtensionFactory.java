@@ -26,23 +26,32 @@ import java.util.List;
 
 /**
  * AdaptiveExtensionFactory
+ * 自适应 ExtensionFactory 拓展实现类
  */
 @Adaptive
 public class AdaptiveExtensionFactory implements ExtensionFactory {
 
+    /**
+     * ExtensionFactory 拓展对象集合
+     */
     private final List<ExtensionFactory> factories;
 
     public AdaptiveExtensionFactory() {
+        // 使用 ExtensionLoader 加载拓展对象实现类。
         ExtensionLoader<ExtensionFactory> loader = ExtensionLoader.getExtensionLoader(ExtensionFactory.class);
         List<ExtensionFactory> list = new ArrayList<ExtensionFactory>();
+        // // 加载遍历拓展对象
         for (String name : loader.getSupportedExtensions()) {
+            // 获得拓展对象
             list.add(loader.getExtension(name));
         }
+        // 没自己实现 ExtensionFactory 的情况下，factories 为 SpiExtensionFactory 和 SpringExtensionFactory
         factories = Collections.unmodifiableList(list);
     }
 
     @Override
     public <T> T getExtension(Class<T> type, String name) {
+        // 遍历 factories ，调用其 #getExtension(type, name) 方法，直到获得到属性值。
         for (ExtensionFactory factory : factories) {
             T extension = factory.getExtension(type, name);
             if (extension != null) {
