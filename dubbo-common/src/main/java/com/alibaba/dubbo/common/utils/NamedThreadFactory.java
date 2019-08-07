@@ -27,11 +27,12 @@ public class NamedThreadFactory implements ThreadFactory {
     protected static final AtomicInteger POOL_SEQ = new AtomicInteger(1);
 
     protected final AtomicInteger mThreadNum = new AtomicInteger(1);
-
+    // 线程名前缀
     protected final String mPrefix;
-
+    // 是否是守护线程
+    // 守护线程与普通线程的唯一区别是：当JVM中所有的线程都是守护线程的时候，JVM就可以退出了；如果还有一个或以上的非守护线程则不会退出。
     protected final boolean mDaemon;
-
+    // 线程组
     protected final ThreadGroup mGroup;
 
     public NamedThreadFactory() {

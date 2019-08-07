@@ -23,6 +23,9 @@ import java.lang.management.MonitorInfo;
 import java.lang.management.ThreadInfo;
 import java.lang.management.ThreadMXBean;
 
+/**
+ * JVM 工具类。目前，仅有 JStack 功能
+ */
 public class JVMUtil {
     public static void jstack(OutputStream stream) throws Exception {
         ThreadMXBean threadMxBean = ManagementFactory.getThreadMXBean();
@@ -50,8 +53,11 @@ public class JVMUtil {
         }
         sb.append('\n');
         int i = 0;
-
+        // 返回一个表示该线程堆栈转储的堆栈跟踪元素数组。如果该线程尚未启动或已经终止，则该方法将返回一个零长度数组。
+        // 如果返回的数组不是零长度的，则其第一个元素代表堆栈顶，它是该序列中最新的方法调用。最后一个元素代表堆栈底，是该序列中最旧的方法调用。
         StackTraceElement[] stackTrace = threadInfo.getStackTrace();
+        // 返回 monitorinfo 对象数组，每个数组元素表示关联此 threadinfo 的线程当前锁定的对象监视器。
+        // 如果没有为此线程信息请求任何锁定的监视器，或者线程没有锁定任何监视器，那么此方法返回长度为 0 的数组。
         MonitorInfo[] lockedMonitors = threadInfo.getLockedMonitors();
         for (; i < stackTrace.length && i < 32; i++) {
             StackTraceElement ste = stackTrace[i];
@@ -61,6 +67,7 @@ public class JVMUtil {
                 Thread.State ts = threadInfo.getThreadState();
                 switch (ts) {
                     case BLOCKED:
+                        // 对象的 lockinfo，线程将锁定并等待该对象（如果有）；否则返回 null
                         sb.append("\t-  blocked on " + threadInfo.getLockInfo());
                         sb.append('\n');
                         break;
@@ -87,7 +94,8 @@ public class JVMUtil {
             sb.append("\t...");
             sb.append('\n');
         }
-
+        // 返回 lockinfo 对象数组，每个数组元素表示关联此 threadinfo 的线程当前锁定的可拥有同步器。
+        // 如果没有为此线程信息请求任何锁定的同步器，或者线程没有锁定任何同步器，那么此方法返回长度为 0 的数组。
         LockInfo[] locks = threadInfo.getLockedSynchronizers();
         if (locks.length > 0) {
             sb.append("\n\tNumber of locked synchronizers = " + locks.length);
