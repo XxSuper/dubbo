@@ -82,6 +82,7 @@ public class ClassHelper {
 
     /**
      * get class loader
+     * 参考链接：https://blog.csdn.net/puhaiyang/article/details/82913871、https://www.cnblogs.com/gaoxing/p/4703412.html
      *
      * @param cls
      * @return class loader

@@ -40,11 +40,14 @@ public abstract class Wrapper {
     private static final String[] EMPTY_STRING_ARRAY = new String[0];
     private static final String[] OBJECT_METHODS = new String[]{"getClass", "hashCode", "toString", "equals"};
     private static final Wrapper OBJECT_WRAPPER = new Wrapper() {
+
+        // getMethod：获取当前类和父类的所有public的方法。这里的父类，指的是继承层次中的所有父类。比如说，A继承B，B继承C，那么B和C都属于A的父类。
         @Override
         public String[] getMethodNames() {
             return OBJECT_METHODS;
         }
 
+        // getDeclaredMethod：获取当前类的所有声明的方法，包括public、protected和private修饰的方法。需要注意的是，这些方法一定是在当前类中声明的，从父类中继承的不算，实现接口的方法由于有声明所以包括在内。
         @Override
         public String[] getDeclaredMethodNames() {
             return OBJECT_METHODS;
@@ -110,6 +113,14 @@ public abstract class Wrapper {
         return ret;
     }
 
+    /**
+     * Dubbo在创建Invoker的时候先将ref实现类包装成了一个Wrapper, 然后Invoker被调用的时候会触发doInvoke()方法, 然后调用Wrapper的invokeMethod()方法。
+     * 由于Wrapper是一个抽象类,故Wrapper.getWrapper()被调用的时候肯定是利用了字节码增强的技术为Wrapper创建了一个实现类。
+     * Wrapper子类生成是利用javassist技术来实现的
+     * 参考链接：https://www.jianshu.com/p/8bc52786ba07
+     * @param c
+     * @return
+     */
     private static Wrapper makeWrapper(Class<?> c) {
         // c是否为基本数据类型
         if (c.isPrimitive())

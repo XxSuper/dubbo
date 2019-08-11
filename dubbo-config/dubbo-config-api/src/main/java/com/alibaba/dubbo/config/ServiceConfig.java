@@ -413,6 +413,7 @@ public class ServiceConfig<T> extends AbstractServiceConfig {
         List<URL> registryURLs = loadRegistries(true);
         // 循环 `protocols` ，向逐个注册中心分组暴露服务。
         for (ProtocolConfig protocolConfig : protocols) {
+            // 使用对应的协议，逐个向注册中心分组暴露服务，在这个方法中，包含了本地和远程两种暴露方式
             doExportUrlsFor1Protocol(protocolConfig, registryURLs);
         }
     }

@@ -230,6 +230,7 @@ public abstract class AbstractConfig implements Serializable {
                     }
                     // 获得属性名
                     int i = name.startsWith("get") ? 3 : 2;
+                    // 获取配置名
                     String prop = StringUtils.camelToSplitName(name.substring(i, i + 1).toLowerCase() + name.substring(i + 1), ".");
                     String key;
                     // 获取键（别名）
