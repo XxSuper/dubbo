@@ -107,11 +107,11 @@ public class ProtocolFilterWrapper implements Protocol {
 
     @Override
     public <T> Exporter<T> export(Invoker<T> invoker) throws RpcException {
-        // 注册中心
+        // 当 invoker.url.protocl = registry ，注册中心的 URL ，无需创建 Filter 过滤链
         if (Constants.REGISTRY_PROTOCOL.equals(invoker.getUrl().getProtocol())) {
             return protocol.export(invoker);
         }
-        // 建立带有 Filter 过滤链的 Invoker ，再暴露服务。
+        // 建立带有 Filter 过滤链的 Invoker 对象，再暴露服务。
         return protocol.export(buildInvokerChain(invoker, Constants.SERVICE_FILTER_KEY, Constants.PROVIDER));
     }
 

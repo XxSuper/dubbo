@@ -34,6 +34,15 @@ import java.util.regex.Matcher;
 
 /**
  * Wrapper.
+ *
+ * Dubbo Wrapper 可以认为是一种反射机制。它既可以读写目标实例的字段，也可以调用目标实例的方法。可以认为是重写了JDK的反射机制。比如
+ *
+ * Car是接口，RaceCar是实现类，实现了Car；ferrari和porsche是RaceCar的两个实例
+ * Dubbo为接口Car生成一个Warpper子类，比如Wrapper0；然后创建Wrapper0的实例wrapper0
+ * 通过wrapper0#setPropertyValue来修改ferrari的字段，也可以修改porsche的字段
+ * 通过wrapper0#invokeMethod来调用ferrari的方法，也可以调用porsche的方法
+ * 优点：通过一个Wrapper0实例就可以操作N个目标接口Car的实例
+ *
  */
 public abstract class Wrapper {
     private static final Map<Class<?>, Wrapper> WRAPPER_MAP = new ConcurrentHashMap<Class<?>, Wrapper>(); //class wrapper map

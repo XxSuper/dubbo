@@ -57,25 +57,52 @@ import static com.alibaba.dubbo.common.Constants.CHECK_KEY;
 
 /**
  * RegistryProtocol
- *
+ * 实现 Protocol 接口，注册中心协议实现类
  */
 public class RegistryProtocol implements Protocol {
 
     private final static Logger logger = LoggerFactory.getLogger(RegistryProtocol.class);
+
+    /**
+     * 静态属性，单例。在 Dubbo SPI 中，被初始化，有且仅有一次。
+     */
     private static RegistryProtocol INSTANCE;
+
     private final Map<URL, NotifyListener> overrideListeners = new ConcurrentHashMap<URL, NotifyListener>();
+
+    /**
+     * 绑定关系集合。
+     *
+     * key：服务提供者 Dubbo URL
+     */
     //To solve the problem of RMI repeated exposure port conflicts, the services that have been exposed are no longer exposed.
     //providerurl <--> exporter
+    // 用于解决rmi重复暴露端口冲突的问题，已经暴露过的服务不再重新暴露
+    // providerurl <--> exporter
     private final Map<String, ExporterChangeableWrapper<?>> bounds = new ConcurrentHashMap<String, ExporterChangeableWrapper<?>>();
+
     private Cluster cluster;
+
+    /**
+     * Protocol 自适应拓展实现类，通过 Dubbo SPI 自动注入。
+     */
     private Protocol protocol;
+
+    /**
+     * RegistryFactory 自适应拓展实现类，通过 Dubbo SPI 自动注入。用于创建注册中心 Registry 对象。
+     */
     private RegistryFactory registryFactory;
+
     private ProxyFactory proxyFactory;
 
     public RegistryProtocol() {
         INSTANCE = this;
     }
 
+    /**
+     * 静态方法，获得单例
+     * @return
+     */
     public static RegistryProtocol getRegistryProtocol() {
         if (INSTANCE == null) {
             ExtensionLoader.getExtensionLoader(Protocol.class).getExtension(Constants.REGISTRY_PROTOCOL); // load
