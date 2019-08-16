@@ -54,6 +54,7 @@ import java.util.concurrent.ConcurrentMap;
 
 /**
  * dubbo protocol support.
+ * 实现 AbstractProtocol 抽象类，Dubbo 协议实现类
  */
 public class DubboProtocol extends AbstractProtocol {
 
@@ -62,7 +63,19 @@ public class DubboProtocol extends AbstractProtocol {
     public static final int DEFAULT_PORT = 20880;
     private static final String IS_CALLBACK_SERVICE_INVOKE = "_isCallBackServiceInvoke";
     private static DubboProtocol INSTANCE;
+
+    /**
+     * 通信服务器集合
+     *
+     * key: 服务器地址。格式为：host:port
+     */
     private final Map<String, ExchangeServer> serverMap = new ConcurrentHashMap<String, ExchangeServer>(); // <host:port,Exchanger>
+
+    /**
+     * 通信客户端集合
+     *
+     * key: 服务器地址。格式为：host:port
+     */
     private final Map<String, ReferenceCountExchangeClient> referenceClientMap = new ConcurrentHashMap<String, ReferenceCountExchangeClient>(); // <host:port,Exchanger>
     private final ConcurrentMap<String, LazyConnectExchangeClient> ghostClientMap = new ConcurrentHashMap<String, LazyConnectExchangeClient>();
     private final ConcurrentMap<String, Object> locks = new ConcurrentHashMap<String, Object>();
@@ -226,11 +239,17 @@ public class DubboProtocol extends AbstractProtocol {
 
     @Override
     public <T> Exporter<T> export(Invoker<T> invoker) throws RpcException {
+        // invoker url（注册 url）
         URL url = invoker.getUrl();
 
         // export service.
+        // 调用 #serviceKey(url) 方法，获得服务键。该方法从父类继承而来
         String key = serviceKey(url);
+
+        // 创建 DubboExporter 对象，并添加到 `exporterMap` 。
         DubboExporter<T> exporter = new DubboExporter<T>(invoker, key, exporterMap);
+
+        // 该属性从父类继承而来
         exporterMap.put(key, exporter);
 
         //export an stub service for dispatching event
@@ -248,44 +267,71 @@ public class DubboProtocol extends AbstractProtocol {
             }
         }
 
+        // 启动服务器
         openServer(url);
+
+        // 初始化序列化优化器
         optimizeSerialization(url);
         return exporter;
     }
 
+    /**
+     * 启动通信服务器
+     * @param url
+     */
     private void openServer(URL url) {
         // find server.
+        // 获取服务器地址
         String key = url.getAddress();
         //client can export a service which's only for server to invoke
+        // 可以暴露一个仅当前 JVM 可调用的服务。目前该配置项已经不存在
         boolean isServer = url.getParameter(Constants.IS_SERVER_KEY, true);
         if (isServer) {
+            // 从 serverMap 获得对应服务器地址已存在的通信服务器。即，不重复创建
             ExchangeServer server = serverMap.get(key);
             if (server == null) {
+                // 通信服务器不存在，调用 #createServer(url) 方法，创建服务器
                 serverMap.put(key, createServer(url));
             } else {
                 // server supports reset, use together with override
+                // 通信服务器已存在，调用 Server#reset(url) 方法，重置服务器的属性
+                // 为什么会存在呢？因为键是 host:port ，那么例如，多个 Service 共用同一个 Protocol ，服务器是同一个对象
                 server.reset(url);
             }
         }
     }
 
+    /**
+     * 创建并启动通信服务器
+     * @param url
+     * @return
+     */
     private ExchangeServer createServer(URL url) {
         // send readonly event when server closes, it's enabled by default
+        // 默认开启 server 关闭时发送 READ_ONLY 事件
         url = url.addParameterIfAbsent(Constants.CHANNEL_READONLYEVENT_SENT_KEY, Boolean.TRUE.toString());
+
         // enable heartbeat by default
+        // 默认开启 heartbeat
         url = url.addParameterIfAbsent(Constants.HEARTBEAT_KEY, String.valueOf(Constants.DEFAULT_HEARTBEAT));
         String str = url.getParameter(Constants.SERVER_KEY, Constants.DEFAULT_REMOTING_SERVER);
 
+        // 校验配置的 Server 的 Dubbo SPI 拓展是否存在。若不存在，抛出 RpcException 异常
         if (str != null && str.length() > 0 && !ExtensionLoader.getExtensionLoader(Transporter.class).hasExtension(str))
             throw new RpcException("Unsupported server type: " + str + ", url: " + url);
 
+        // 设置编解码器为 "Dubbo" 协议，即 DubboCountCodec
         url = url.addParameter(Constants.CODEC_KEY, DubboCodec.NAME);
+
+        // 启动服务器
         ExchangeServer server;
         try {
             server = Exchangers.bind(url, requestHandler);
         } catch (RemotingException e) {
             throw new RpcException("Fail to start server(url: " + url + ") " + e.getMessage(), e);
         }
+
+        // 校验配置的 Client 的 Dubbo SPI 拓展是否存在。若不存在，抛出 RpcException 异常。默认情况下，未配置，所以不会校验。
         str = url.getParameter(Constants.CLIENT_KEY);
         if (str != null && str.length() > 0) {
             Set<String> supportedTypes = ExtensionLoader.getExtensionLoader(Transporter.class).getSupportedExtensions();
