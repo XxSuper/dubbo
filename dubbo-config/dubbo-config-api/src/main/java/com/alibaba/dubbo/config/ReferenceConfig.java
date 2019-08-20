@@ -423,6 +423,7 @@ public class ReferenceConfig<T> extends AbstractReferenceConfig {
             // 创建服务引用 URL 对象
             URL url = new URL(Constants.LOCAL_PROTOCOL, NetUtils.LOCALHOST, 0, interfaceClass.getName()).addParameters(map);
             // 引用服务，返回 Invoker 对象
+            // 此处 Dubbo SPI 自适应的特性的好处就出来了，可以自动根据 URL 参数，获得对应的拓展实现。
             invoker = refprotocol.refer(interfaceClass, url);
             if (logger.isInfoEnabled()) {
                 logger.info("Using injvm service " + interfaceClass.getName());
