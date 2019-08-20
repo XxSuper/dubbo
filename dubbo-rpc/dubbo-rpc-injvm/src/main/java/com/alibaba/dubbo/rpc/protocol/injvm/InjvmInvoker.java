@@ -29,11 +29,23 @@ import java.util.Map;
 
 /**
  * InjvmInvoker
+ *
+ * 实现 AbstractInvoker 抽象类，Injvm Invoker 实现类
  */
 class InjvmInvoker<T> extends AbstractInvoker<T> {
 
+    /**
+     * 服务键
+     */
     private final String key;
 
+    /**
+     * Exporter 集合
+     *
+     * key: 服务键
+     *
+     * 该值实际就是 {@link com.alibaba.dubbo.rpc.protocol.AbstractProtocol#exporterMap}
+     */
     private final Map<String, Exporter<?>> exporterMap;
 
     InjvmInvoker(Class<T> type, URL url, String key, Map<String, Exporter<?>> exporterMap) {
@@ -42,8 +54,14 @@ class InjvmInvoker<T> extends AbstractInvoker<T> {
         this.exporterMap = exporterMap;
     }
 
+    /**
+     * 是否可用，开启 启动时检查 时，调用该方法，判断该 Invoker 对象，是否有对应的 Exporter 。若不存在，说明依赖服务不存在，检查不通过
+     *
+     * @return
+     */
     @Override
     public boolean isAvailable() {
+        // 判断是否有 Exporter 对象
         InjvmExporter<?> exporter = (InjvmExporter<?>) exporterMap.get(key);
         if (exporter == null) {
             return false;
@@ -54,6 +72,7 @@ class InjvmInvoker<T> extends AbstractInvoker<T> {
 
     @Override
     public Result doInvoke(Invocation invocation) throws Throwable {
+        // 通过该 Invoker 的 key 属性，获得对应的 Exporter 对象
         Exporter<?> exporter = InjvmProtocol.getExporter(exporterMap, getUrl());
         if (exporter == null) {
             throw new RpcException("Service [" + key + "] not found.");
