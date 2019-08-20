@@ -29,21 +29,36 @@ import java.util.List;
 
 /**
  * ListenerInvoker
+ *
+ * 实现 Invoker 接口，具有监听器功能的 Invoker 包装器
  */
 public class ListenerInvokerWrapper<T> implements Invoker<T> {
 
     private static final Logger logger = LoggerFactory.getLogger(ListenerInvokerWrapper.class);
 
+    /**
+     * 真实的 Invoker 对象
+     */
     private final Invoker<T> invoker;
 
+    /**
+     * Invoker 监听器数组
+     */
     private final List<InvokerListener> listeners;
 
+    /**
+     * 循环 listeners ，执行 InvokerListener#referred(invoker) 方法。
+     * 和 ListenerExporterWrapper 不同，若执行过程中发生异常 RuntimeException ，仅打印错误日志，继续执行，最终不抛出异常。
+     * @param invoker
+     * @param listeners
+     */
     public ListenerInvokerWrapper(Invoker<T> invoker, List<InvokerListener> listeners) {
         if (invoker == null) {
             throw new IllegalArgumentException("invoker == null");
         }
         this.invoker = invoker;
         this.listeners = listeners;
+        // 执行监听器
         if (listeners != null && !listeners.isEmpty()) {
             for (InvokerListener listener : listeners) {
                 if (listener != null) {
@@ -82,6 +97,10 @@ public class ListenerInvokerWrapper<T> implements Invoker<T> {
         return getInterface() + " -> " + (getUrl() == null ? " " : getUrl().toString());
     }
 
+    /**
+     * 循环 listeners ，执行 InvokerListener#destroyed(invoker) 。
+     * 和 ListenerExporterWrapper 不同，若执行过程中发生异常 RuntimeException ，仅打印错误日志，继续执行，最终不抛出异常。
+     */
     @Override
     public void destroy() {
         try {
@@ -91,6 +110,7 @@ public class ListenerInvokerWrapper<T> implements Invoker<T> {
                 for (InvokerListener listener : listeners) {
                     if (listener != null) {
                         try {
+                            // 执行监听器
                             listener.destroyed(invoker);
                         } catch (Throwable t) {
                             logger.error(t.getMessage(), t);
