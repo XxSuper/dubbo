@@ -117,7 +117,7 @@ public class ProtocolFilterWrapper implements Protocol {
 
     @Override
     public <T> Invoker<T> refer(Class<T> type, URL url) throws RpcException {
-        // 注册中心
+        // 当 invoker.url.protocl = registry ，注册中心的 URL ，无需创建 Filter 过滤链。调用 protocol#refer(type, url) 方法，继续引用服务，最终返回 Invoker 。
         if (Constants.REGISTRY_PROTOCOL.equals(url.getProtocol())) {
             return protocol.refer(type, url);
         }
