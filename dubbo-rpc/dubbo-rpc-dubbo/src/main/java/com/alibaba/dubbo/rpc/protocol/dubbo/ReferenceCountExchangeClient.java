@@ -31,20 +31,43 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * dubbo protocol support class.
+ *
+ * 实现 ExchangeClient 接口，支持指向计数的信息交换客户端实现类。
  */
 @SuppressWarnings("deprecation")
 final class ReferenceCountExchangeClient implements ExchangeClient {
 
+    /**
+     * URL
+     */
     private final URL url;
+
+    /**
+     * 指向数量
+     *
+     *【初始】构造方法，计数加一。
+     *【引用】每次引用，计数加一。
+     */
     private final AtomicInteger refenceCount = new AtomicInteger(0);
 
+    /**
+     * 幽灵客户端集合
+     * 和 Protocol.ghostClientMap 参数，一致。
+     */
     //    private final ExchangeHandler handler;
     private final ConcurrentMap<String, LazyConnectExchangeClient> ghostClientMap;
+
+    /**
+     * 客户端
+     *【创建】构造方法，传入 client 属性，指向它。
+     *【关闭】关闭方法，创建 LazyConnectExchangeClient 对象，指向该幽灵客户端。
+     */
     private ExchangeClient client;
 
 
     public ReferenceCountExchangeClient(ExchangeClient client, ConcurrentMap<String, LazyConnectExchangeClient> ghostClientMap) {
         this.client = client;
+        // 指向加一，指向计数加1
         refenceCount.incrementAndGet();
         this.url = client.getUrl();
         if (ghostClientMap == null) {
@@ -52,6 +75,8 @@ final class ReferenceCountExchangeClient implements ExchangeClient {
         }
         this.ghostClientMap = ghostClientMap;
     }
+
+    // ************ 基于装饰器模式，所以，每个实现方法，都是调用 client 的对应的方法。 *********** //
 
     @Override
     public void reset(URL url) {
@@ -148,12 +173,15 @@ final class ReferenceCountExchangeClient implements ExchangeClient {
 
     @Override
     public void close(int timeout) {
+        // 计数减一。若无指向，进行真正的关闭。
         if (refenceCount.decrementAndGet() <= 0) {
+            // 调用 client 的关闭方法，进行关闭。
             if (timeout == 0) {
                 client.close();
             } else {
                 client.close(timeout);
             }
+            // 替换 `client` 为 LazyConnectExchangeClient 对象。
             client = replaceWithLazyClient();
         }
     }
@@ -165,6 +193,8 @@ final class ReferenceCountExchangeClient implements ExchangeClient {
 
     // ghost client
     private LazyConnectExchangeClient replaceWithLazyClient() {
+        // 基于 url ，创建 LazyConnectExchangeClient 的 URL 链接。设置的一些参数
+        // 这是一种防御性操作，避免客户端意外关闭，客户端的初始状态是错误的。
         // this is a defensive operation to avoid client is closed by accident, the initial state of the client is false
         URL lazyUrl = url.addParameter(Constants.LAZY_CONNECT_INITIAL_STATE_KEY, Boolean.FALSE)
                 .addParameter(Constants.RECONNECT_KEY, Boolean.FALSE)
@@ -173,6 +203,7 @@ final class ReferenceCountExchangeClient implements ExchangeClient {
                 .addParameter(LazyConnectExchangeClient.REQUEST_WITH_WARNING_KEY, true)
                 .addParameter("_client_memo", "referencecounthandler.replacewithlazyclient");
 
+        // 创建 LazyConnectExchangeClient 对象，若不存在。
         String key = url.getAddress();
         // in worst case there's only one ghost connection.
         LazyConnectExchangeClient gclient = ghostClientMap.get(key);
@@ -188,6 +219,9 @@ final class ReferenceCountExchangeClient implements ExchangeClient {
         return client.isClosed();
     }
 
+    /**
+     * 计数
+     */
     public void incrementAndGetCount() {
         refenceCount.incrementAndGet();
     }
