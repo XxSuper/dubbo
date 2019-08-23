@@ -36,25 +36,38 @@ import org.apache.zookeeper.WatchedEvent;
 import java.util.Collections;
 import java.util.List;
 
+/**
+ * 实现 AbstractZookeeperClient 抽象类，基于 Curator 的 Zookeeper 客户端实现类。
+ */
 public class CuratorZookeeperClient extends AbstractZookeeperClient<CuratorWatcher> {
 
+    /**
+     * client 对象
+     */
     private final CuratorFramework client;
 
     public CuratorZookeeperClient(URL url) {
         super(url);
         try {
+            // 创建 client 对象
             CuratorFrameworkFactory.Builder builder = CuratorFrameworkFactory.builder()
+                    // 连接地址
                     .connectString(url.getBackupAddress())
+                    // 重试策略，1 次，间隔 1000 ms
                     .retryPolicy(new RetryNTimes(1, 1000))
+                    // 连接超时时间
                     .connectionTimeoutMs(5000);
+            // 用户名:密码
             String authority = url.getAuthority();
             if (authority != null && authority.length() > 0) {
                 builder = builder.authorization("digest", authority.getBytes());
             }
             client = builder.build();
+            // 添加连接监听器
             client.getConnectionStateListenable().addListener(new ConnectionStateListener() {
                 @Override
                 public void stateChanged(CuratorFramework client, ConnectionState state) {
+                    // 在连接状态发生变化时，调用 #stateChange(state) 方法，进行 StateListener 的回调。
                     if (state == ConnectionState.LOST) {
                         CuratorZookeeperClient.this.stateChanged(StateListener.DISCONNECTED);
                     } else if (state == ConnectionState.CONNECTED) {
@@ -64,6 +77,7 @@ public class CuratorZookeeperClient extends AbstractZookeeperClient<CuratorWatch
                     }
                 }
             });
+            // 启动 client
             client.start();
         } catch (Exception e) {
             throw new IllegalStateException(e.getMessage(), e);
@@ -73,6 +87,7 @@ public class CuratorZookeeperClient extends AbstractZookeeperClient<CuratorWatch
     @Override
     public void createPersistent(String path) {
         try {
+            // 创建一个节点，初始内容为空
             client.create().forPath(path);
         } catch (NodeExistsException e) {
         } catch (Exception e) {
@@ -83,6 +98,7 @@ public class CuratorZookeeperClient extends AbstractZookeeperClient<CuratorWatch
     @Override
     public void createEphemeral(String path) {
         try {
+            // 创建一个节点，指定创建模式（临时节点），内容为空
             client.create().withMode(CreateMode.EPHEMERAL).forPath(path);
         } catch (NodeExistsException e) {
         } catch (Exception e) {
@@ -93,6 +109,7 @@ public class CuratorZookeeperClient extends AbstractZookeeperClient<CuratorWatch
     @Override
     public void delete(String path) {
         try {
+            // 删除一个节点，此方法只能删除叶子节点，否则会抛出异常
             client.delete().forPath(path);
         } catch (NoNodeException e) {
         } catch (Exception e) {
@@ -103,6 +120,7 @@ public class CuratorZookeeperClient extends AbstractZookeeperClient<CuratorWatch
     @Override
     public List<String> getChildren(String path) {
         try {
+            // 获取某个节点的所有子节点路径
             return client.getChildren().forPath(path);
         } catch (NoNodeException e) {
             return null;
@@ -114,6 +132,7 @@ public class CuratorZookeeperClient extends AbstractZookeeperClient<CuratorWatch
     @Override
     public boolean checkExists(String path) {
         try {
+            // 检查节点是否存在
             if (client.checkExists().forPath(path) != null) {
                 return true;
             }
@@ -123,16 +142,19 @@ public class CuratorZookeeperClient extends AbstractZookeeperClient<CuratorWatch
     }
     @Override
     public boolean isConnected() {
+        // 获取客户端连接状态
         return client.getZookeeperClient().isConnected();
     }
 
     @Override
     public void doClose() {
+        // 关闭客户端连接
         client.close();
     }
 
     @Override
     public CuratorWatcher createTargetChildListener(String path, ChildListener listener) {
+        // 创建监听
         return new CuratorWatcherImpl(listener);
     }
 
@@ -154,12 +176,18 @@ public class CuratorZookeeperClient extends AbstractZookeeperClient<CuratorWatch
 
     private class CuratorWatcherImpl implements CuratorWatcher {
 
+        /**
+         * 节点监听器
+         */
         private volatile ChildListener listener;
 
         public CuratorWatcherImpl(ChildListener listener) {
             this.listener = listener;
         }
 
+        /**
+         * 取消节点监听器
+         */
         public void unwatch() {
             this.listener = null;
         }
@@ -168,10 +196,12 @@ public class CuratorZookeeperClient extends AbstractZookeeperClient<CuratorWatch
         public void process(WatchedEvent event) throws Exception {
             if (listener != null) {
                 String path = event.getPath() == null ? "" : event.getPath();
+                // 通知子节点发生变化的回调
                 listener.childChanged(path,
                         // if path is null, curator using watcher will throw NullPointerException.
                         // if client connect or disconnect to server, zookeeper will queue
                         // watched event(Watcher.Event.EventType.None, .., path = null).
+                        // 重新发起连接，并传入最新的子节点列表
                         StringUtils.isNotEmpty(path)
                                 ? client.getChildren().usingWatcher(this).forPath(path)
                                 : Collections.<String>emptyList());

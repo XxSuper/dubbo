@@ -20,6 +20,10 @@ import com.alibaba.dubbo.common.URL;
 import com.alibaba.dubbo.remoting.zookeeper.ZookeeperClient;
 import com.alibaba.dubbo.remoting.zookeeper.ZookeeperTransporter;
 
+/**
+ * ZookeeperTransporter
+ * 实现 ZookeeperTransporter 接口，ZookeeperTransporter 工厂实现类
+ */
 public class CuratorZookeeperTransporter implements ZookeeperTransporter {
 
     @Override

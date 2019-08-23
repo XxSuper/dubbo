@@ -35,6 +35,9 @@ import java.util.concurrent.TimeUnit;
  * Zkclient wrapper class that can monitor the state of the connection automatically after the connection is out of time
  * It is also consistent with the use of curator
  *
+ * 连接超时后，能自动监听连接状态的zkclient包装类
+ * 也为和curator在使用上总体保持一致
+ *
  * @date 2017/10/29
  */
 public class ZkClientWrapper {
