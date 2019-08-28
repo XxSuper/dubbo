@@ -282,6 +282,7 @@ public abstract class AbstractRegistry implements Registry {
             String key = (String) entry.getKey();
             String value = (String) entry.getValue();
             if (key != null && key.length() > 0 && key.equals(url.getServiceKey())
+                    // Character.isLetter() 方法用于判断指定字符是否为字母
                     && (Character.isLetter(key.charAt(0)) || key.charAt(0) == '_')
                     && value != null && value.length() > 0) {
                 String[] arr = value.trim().split(URL_SPLIT);
@@ -402,6 +403,9 @@ public abstract class AbstractRegistry implements Registry {
         }
     }
 
+    /**
+     * 在注册中心断开，重连成功，调用 #recover() 方法，进行恢复注册和订阅
+     */
     protected void recover() throws Exception {
         // register
         Set<URL> recoverRegistered = new HashSet<URL>(getRegistered());
@@ -451,6 +455,19 @@ public abstract class AbstractRegistry implements Registry {
         }
     }
 
+    /**
+     * 通知监听器，URL 变化结果
+     *
+     * 数据流向 `urls` => {@link #notified} => {@link #properties} => {@link #file}
+     *
+     * 每次传入的 urls 的“全量”，指的是至少要是一个分类的全量，而不一定是全部数据。
+     *
+     * 第一，向注册中心发起订阅后，会获取到全量数据，此时会被调用 #notify(...) 方法，即 Registry 获取到了全量数据。
+     * 第二，每次注册中心发生变更时，会调用 #notify(...) 方法，虽然变化是增量，调用这个方法的调用方，已经进行处理，传入的 urls 依然是全量的。
+     * @param url 消费者 URL
+     * @param listener 监听器
+     * @param urls urls 通知的 URL 变化结果（全量数据）
+     */
     protected void notify(URL url, NotifyListener listener, List<URL> urls) {
         if (url == null) {
             throw new IllegalArgumentException("notify url == null");
@@ -466,10 +483,15 @@ public abstract class AbstractRegistry implements Registry {
         if (logger.isInfoEnabled()) {
             logger.info("Notify urls for subscribe url " + url + ", urls: " + urls);
         }
+        // 将 `urls` 按照 `url.parameter.category` 分类，添加到集合
         Map<String, List<URL>> result = new HashMap<String, List<URL>>();
+        // 遍历 `urls`
         for (URL u : urls) {
+            // 服务消费者与服务提供者是否匹配
             if (UrlUtils.isMatch(url, u)) {
+                // 获取服务提供者分类
                 String category = u.getParameter(Constants.CATEGORY_KEY, Constants.DEFAULT_CATEGORY);
+                // 按分类分组
                 List<URL> categoryList = result.get(category);
                 if (categoryList == null) {
                     categoryList = new ArrayList<URL>();
@@ -481,26 +503,38 @@ public abstract class AbstractRegistry implements Registry {
         if (result.size() == 0) {
             return;
         }
+        // 获得消费者 URL 对应的在 `notified` 中数据
         Map<String, List<URL>> categoryNotified = notified.get(url);
         if (categoryNotified == null) {
             notified.putIfAbsent(url, new ConcurrentHashMap<String, List<URL>>());
             categoryNotified = notified.get(url);
         }
+        // 按照分类，循环处理通知的 URL 变化结果（全量数据）。
         for (Map.Entry<String, List<URL>> entry : result.entrySet()) {
             String category = entry.getKey();
             List<URL> categoryList = entry.getValue();
+            // 将 result 覆盖到 notified 中。
+            // 当某个分类的数据为空时，会依然有 urls 。其中 `urls[0].protocol = empty` ，通过这样的方式，处理所有服务提供者为空的情况。
             categoryNotified.put(category, categoryList);
+            // 保存到文件
             saveProperties(url);
+            // 通知监听器处理。例如，有新的服务提供者启动时，被通知，创建新的 Invoker 对象。
             listener.notify(categoryList);
         }
     }
 
+    /**
+     * 保存单个消费者 URL 对应，在 `notified` 的数据，到文件。
+     *
+     * @param url 消费者 URL
+     */
     private void saveProperties(URL url) {
         if (file == null) {
             return;
         }
 
         try {
+            // 拼接 URL
             StringBuilder buf = new StringBuilder();
             Map<String, List<URL>> categoryNotified = notified.get(url);
             if (categoryNotified != null) {
@@ -513,8 +547,11 @@ public abstract class AbstractRegistry implements Registry {
                     }
                 }
             }
+            // 设置到 properties 中
             properties.setProperty(url.getServiceKey(), buf.toString());
+            // 增加数据版本号
             long version = lastCacheChanged.incrementAndGet();
+            // 保存到Properties文件
             if (syncSaveFile) {
                 doSaveProperties(version);
             } else {
@@ -525,11 +562,15 @@ public abstract class AbstractRegistry implements Registry {
         }
     }
 
+    /**
+     * 在 JVM 关闭时，调用 #destroy() 方法，进行取消注册和订阅。
+     */
     @Override
     public void destroy() {
         if (logger.isInfoEnabled()) {
             logger.info("Destroy registry:" + getUrl());
         }
+        // 取消注册
         Set<URL> destroyRegistered = new HashSet<URL>(getRegistered());
         if (!destroyRegistered.isEmpty()) {
             for (URL url : new HashSet<URL>(getRegistered())) {
@@ -545,6 +586,7 @@ public abstract class AbstractRegistry implements Registry {
                 }
             }
         }
+        // 取消订阅
         Map<URL, Set<NotifyListener>> destroySubscribed = new HashMap<URL, Set<NotifyListener>>(getSubscribed());
         if (!destroySubscribed.isEmpty()) {
             for (Map.Entry<URL, Set<NotifyListener>> entry : destroySubscribed.entrySet()) {

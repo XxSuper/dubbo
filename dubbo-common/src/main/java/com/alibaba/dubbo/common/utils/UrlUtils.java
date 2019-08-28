@@ -383,12 +383,16 @@ public class UrlUtils {
 
     public static boolean isMatchCategory(String category, String categories) {
         if (categories == null || categories.length() == 0) {
+            // 服务消费者分类为空，判断服务提供者分类是否为 providers
             return Constants.DEFAULT_CATEGORY.equals(category);
         } else if (categories.contains(Constants.ANY_VALUE)) {
+            // 服务消费者分类为 *，匹配
             return true;
         } else if (categories.contains(Constants.REMOVE_VALUE_PREFIX)) {
+            // 服务消费者分类包含移除-，判断是否移除服务提供者分类
             return !categories.contains(Constants.REMOVE_VALUE_PREFIX + category);
         } else {
+            // 服务消费者分类是否包含服务提供者分类
             return categories.contains(category);
         }
     }
@@ -396,24 +400,31 @@ public class UrlUtils {
     public static boolean isMatch(URL consumerUrl, URL providerUrl) {
         String consumerInterface = consumerUrl.getServiceInterface();
         String providerInterface = providerUrl.getServiceInterface();
+        // consumerInterface 为 *，或者 consumerInterface 与 providerInterface 相等，匹配
         if (!(Constants.ANY_VALUE.equals(consumerInterface) || StringUtils.isEquals(consumerInterface, providerInterface)))
             return false;
-
+        // 服务提供者的分类与服务提供者的分类是否匹配
         if (!isMatchCategory(providerUrl.getParameter(Constants.CATEGORY_KEY, Constants.DEFAULT_CATEGORY),
                 consumerUrl.getParameter(Constants.CATEGORY_KEY, Constants.DEFAULT_CATEGORY))) {
             return false;
         }
+        // 服务提供者不可用并且服务消费者可用状态不为*
         if (!providerUrl.getParameter(Constants.ENABLED_KEY, true)
                 && !Constants.ANY_VALUE.equals(consumerUrl.getParameter(Constants.ENABLED_KEY))) {
             return false;
         }
-
+        // 服务消费者分组
         String consumerGroup = consumerUrl.getParameter(Constants.GROUP_KEY);
+        // 服务消费者版本
         String consumerVersion = consumerUrl.getParameter(Constants.VERSION_KEY);
+        // 服务消费者类型
         String consumerClassifier = consumerUrl.getParameter(Constants.CLASSIFIER_KEY, Constants.ANY_VALUE);
 
+        // 服务提供者分组
         String providerGroup = providerUrl.getParameter(Constants.GROUP_KEY);
+        // 服务提供者版本
         String providerVersion = providerUrl.getParameter(Constants.VERSION_KEY);
+        // 服务提供者类型
         String providerClassifier = providerUrl.getParameter(Constants.CLASSIFIER_KEY, Constants.ANY_VALUE);
         return (Constants.ANY_VALUE.equals(consumerGroup) || StringUtils.isEquals(consumerGroup, providerGroup) || StringUtils.isContains(consumerGroup, providerGroup))
                 && (Constants.ANY_VALUE.equals(consumerVersion) || StringUtils.isEquals(consumerVersion, providerVersion))
