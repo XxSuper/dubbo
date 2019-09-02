@@ -443,7 +443,13 @@ public class RedisRegistry extends FailbackRegistry {
     public void doUnsubscribe(URL url, NotifyListener listener) {
     }
 
+    /**
+     *
+     * @param jedis
+     * @param key 分类数组，例如：`/dubbo/com.alibaba.dubbo.demo.DemoService/providers`
+     */
     private void doNotify(Jedis jedis, String key) {
+        // 遍历订阅 URL 的监听器集合
         for (Map.Entry<URL, Set<NotifyListener>> entry : new HashMap<URL, Set<NotifyListener>>(getSubscribed()).entrySet()) {
             doNotify(jedis, Arrays.asList(key), entry.getKey(), new HashSet<NotifyListener>(entry.getValue()));
         }
