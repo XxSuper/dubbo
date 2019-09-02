@@ -264,19 +264,26 @@ public class RedisRegistry extends FailbackRegistry {
 
     @Override
     public void doRegister(URL url) {
+        // 获得分类路径作为 Key，root + service + category
         String key = toCategoryPath(url);
+        // 获得 URL 字符串作为 Value
         String value = url.toFullString();
+        // 计算过期时间，当前时间 + expirePeriod
         String expire = String.valueOf(System.currentTimeMillis() + expirePeriod);
         boolean success = false;
+        // 向 Redis 注册
         RpcException exception = null;
         for (Map.Entry<String, JedisPool> entry : jedisPools.entrySet()) {
             JedisPool jedisPool = entry.getValue();
             try {
                 Jedis jedis = jedisPool.getResource();
                 try {
+                    // 写入 Redis Map 中。注意，过期时间，作为 Map 的值。
                     jedis.hset(key, value, expire);
+                    // 发布 Redis 注册事件。这样订阅该 Key 的服务消费者和监控中心，就会实时从 Redis 读取该服务的最新数据。
                     jedis.publish(key, Constants.REGISTER);
                     success = true;
+                    // 如果非 replicate ，意味着 Redis 服务器端已同步数据，只需写入单台机器。因此，结束循环。否则，满足 replicate ，向所有 Redis 写入。
                     if (!replicate) {
                         break; //  If the server side has synchronized data, just write a single machine
                     }
@@ -287,29 +294,43 @@ public class RedisRegistry extends FailbackRegistry {
                 exception = new RpcException("Failed to register service to redis registry. registry: " + entry.getKey() + ", service: " + url + ", cause: " + t.getMessage(), t);
             }
         }
+        // 处理异常
         if (exception != null) {
             if (success) {
+                // 虽然发生异常，但是结果成功
                 logger.warn(exception.getMessage(), exception);
             } else {
+                // 最终未成功
                 throw exception;
             }
         }
     }
 
+    /**
+     * 当服务消费者或服务提供者，关闭时，会调用 #doUnregister(url) 方法，取消注册。
+     * 在该方法中，会删除对应 Map 中的键 + 发布 unregister 事件，从而实时通知订阅者们。因此，正常情况下，就无需监控中心，做脏数据删除的工作。
+     * @param url
+     */
     @Override
     public void doUnregister(URL url) {
+        // 获得分类路径作为 Key，root + service + category
         String key = toCategoryPath(url);
+        // 获得 URL 字符串作为 Value
         String value = url.toFullString();
         RpcException exception = null;
         boolean success = false;
+        // 向 Redis 取消注册
         for (Map.Entry<String, JedisPool> entry : jedisPools.entrySet()) {
             JedisPool jedisPool = entry.getValue();
             try {
                 Jedis jedis = jedisPool.getResource();
                 try {
+                    // 删除 Redis Map 键
                     jedis.hdel(key, value);
+                    // 发布 Redis 取消注册事件
                     jedis.publish(key, Constants.UNREGISTER);
                     success = true;
+                    //  如果服务器端已同步数据，只需写入单台机器
                     if (!replicate) {
                         break; //  If the server side has synchronized data, just write a single machine
                     }
@@ -320,38 +341,55 @@ public class RedisRegistry extends FailbackRegistry {
                 exception = new RpcException("Failed to unregister service to redis registry. registry: " + entry.getKey() + ", service: " + url + ", cause: " + t.getMessage(), t);
             }
         }
+        // 处理异常
         if (exception != null) {
             if (success) {
+                // 虽然发生异常，但是结果成功
                 logger.warn(exception.getMessage(), exception);
             } else {
+                // 最终未成功
                 throw exception;
             }
         }
     }
 
+    /**
+     * 订阅动作，一定要在获取初始化数据之前。如果反过来，可能获取数据完后，处理的过程中，有数据的变更，我们就无法收到 register unregister 的事件
+     * @param url
+     * @param listener
+     */
     @Override
     public void doSubscribe(final URL url, final NotifyListener listener) {
+        // 获得服务路径，例如：`/dubbo/com.alibaba.dubbo.demo.DemoService`
         String service = toServicePath(url);
+        // 获得通知器 Notifier 对象
         Notifier notifier = notifiers.get(service);
         if (notifier == null) {
+            // 不存在，则创建 Notifier 对象
             Notifier newNotifier = new Notifier(service);
             notifiers.putIfAbsent(service, newNotifier);
             notifier = notifiers.get(service);
             if (notifier == newNotifier) {
+                // 保证并发的情况下，有且仅有一个启动
                 notifier.start();
             }
         }
         boolean success = false;
         RpcException exception = null;
+        // 循环 `jedisPools` ，仅向一个 Redis 发起订阅，直到一个成功。
         for (Map.Entry<String, JedisPool> entry : jedisPools.entrySet()) {
             JedisPool jedisPool = entry.getValue();
             try {
                 Jedis jedis = jedisPool.getResource();
                 try {
+                    // 处理所有 Service 层的发起订阅，例如监控中心的订阅
                     if (service.endsWith(Constants.ANY_VALUE)) {
+                        // 只有监控中心，才清理脏数据。
                         admin = true;
+                        // 获得分类层集合，例如：`/dubbo/com.alibaba.dubbo.demo.DemoService/providers`
                         Set<String> keys = jedis.keys(service);
                         if (keys != null && !keys.isEmpty()) {
+                            // 按照服务聚合 URL 集合
                             Map<String, Set<String>> serviceKeys = new HashMap<String, Set<String>>();
                             for (String key : keys) {
                                 String serviceKey = toServicePath(key);
@@ -362,14 +400,19 @@ public class RedisRegistry extends FailbackRegistry {
                                 }
                                 sk.add(key);
                             }
+                            // 循环 serviceKeys ，按照每个 Service 层的发起通知
                             for (Set<String> sk : serviceKeys.values()) {
                                 doNotify(jedis, sk, url, Arrays.asList(listener));
                             }
                         }
+                    // 适用服务提供者和服务消费者，处理指定 Service 层的初始化数据
                     } else {
+                        // 调用 Jedis#keys(pattern) 方法，获得指定 Service 层下的所有 URL 们，发起通知
                         doNotify(jedis, jedis.keys(service + Constants.PATH_SEPARATOR + Constants.ANY_VALUE), url, Arrays.asList(listener));
                     }
+                    // 标记成功
                     success = true;
+                    // 结束，仅仅从一台服务器读取数据
                     break; // Just read one server's data
                 } finally {
                     jedis.close();
@@ -378,15 +421,24 @@ public class RedisRegistry extends FailbackRegistry {
                 exception = new RpcException("Failed to subscribe service from redis registry. registry: " + entry.getKey() + ", service: " + url + ", cause: " + t.getMessage(), t);
             }
         }
+        // 处理异常
         if (exception != null) {
+            // 标记成功
             if (success) {
+                // 虽然发生异常，但是结果成功
                 logger.warn(exception.getMessage(), exception);
             } else {
+                // 最终未成功
                 throw exception;
             }
         }
     }
 
+    /**
+     * 此处应该增加取消向 Redis 的订阅( Subscribe ) 。在 ZookeeperRegistry 的该方法中，是移除了对应的监听器。
+     * @param url
+     * @param listener
+     */
     @Override
     public void doUnsubscribe(URL url, NotifyListener listener) {
     }
@@ -459,6 +511,14 @@ public class RedisRegistry extends FailbackRegistry {
         return i > 0 ? categoryPath.substring(i + 1) : categoryPath;
     }
 
+    /**
+     * 获得服务路径，主要截掉多余的部分
+     *
+     * Root + Service
+     *
+     * @param categoryPath 分类路径
+     * @return 服务路径
+     */
     private String toServicePath(String categoryPath) {
         int i;
         if (categoryPath.startsWith(root)) {
@@ -469,10 +529,26 @@ public class RedisRegistry extends FailbackRegistry {
         return i > 0 ? categoryPath.substring(0, i) : categoryPath;
     }
 
+    /**
+     * 获得服务路径
+     *
+     * Root + Service
+     *
+     * @param url URL
+     * @return 服务路径
+     */
     private String toServicePath(URL url) {
         return root + url.getServiceInterface();
     }
 
+    /**
+     * 获得分类路径
+     *
+     * Root + Service + Type
+     *
+     * @param url URL
+     * @return 分类路径
+     */
     private String toCategoryPath(URL url) {
         return toServicePath(url) + Constants.PATH_SEPARATOR + url.getParameter(Constants.CATEGORY_KEY, Constants.DEFAULT_CATEGORY);
     }
