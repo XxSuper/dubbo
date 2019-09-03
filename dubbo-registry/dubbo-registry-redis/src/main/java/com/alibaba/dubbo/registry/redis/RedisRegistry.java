@@ -494,56 +494,81 @@ public class RedisRegistry extends FailbackRegistry {
     }
 
     /**
-     *
+     * 通知
      * @param jedis
      * @param key 分类数组，例如：`/dubbo/com.alibaba.dubbo.demo.DemoService/providers`
      */
     private void doNotify(Jedis jedis, String key) {
-        // 遍历订阅 URL 的监听器集合
+        // 获得所有监听器，遍历订阅 URL 的监听器集合
         for (Map.Entry<URL, Set<NotifyListener>> entry : new HashMap<URL, Set<NotifyListener>>(getSubscribed()).entrySet()) {
+            // 循环调用，进行通知。但是呢？这样一来，通知的事件( key )和监听器未必匹配，因此需要进行匹配。
             doNotify(jedis, Arrays.asList(key), entry.getKey(), new HashSet<NotifyListener>(entry.getValue()));
         }
     }
 
+    /**
+     * 通知
+     * @param jedis
+     * @param keys 分类数组
+     * @param url 消费者url
+     * @param listeners 监听器
+     */
     private void doNotify(Jedis jedis, Collection<String> keys, URL url, Collection<NotifyListener> listeners) {
         if (keys == null || keys.isEmpty()
                 || listeners == null || listeners.isEmpty()) {
             return;
         }
+        // 获取当前毫秒数
         long now = System.currentTimeMillis();
         List<URL> result = new ArrayList<URL>();
+        // 获得分类层( Category )，即分类数组
+        // 不同角色关注不同的分类数据。
+        // 服务消费者，关注 providers configurations routes 。
+        // 服务提供者，关注 consumers 。
+        // 监控中心，关注所有
         List<String> categories = Arrays.asList(url.getParameter(Constants.CATEGORY_KEY, new String[0]));
+        // 服务接口
         String consumerService = url.getServiceInterface();
+        // 循环分类层，即每个元素为 Root + Service + Type 例如：`/dubbo/com.alibaba.dubbo.demo.DemoService/providers`
         for (String key : keys) {
+            // 若服务不匹配，返回
             if (!Constants.ANY_VALUE.equals(consumerService)) {
+                // 获取服务名
                 String prvoiderService = toServiceName(key);
                 if (!prvoiderService.equals(consumerService)) {
                     continue;
                 }
             }
+            // 若订阅的不包含该分类，返回
             String category = toCategoryName(key);
             if (!categories.contains(Constants.ANY_VALUE) && !categories.contains(category)) {
                 continue;
             }
+            // 获得所有 URL 数组。并且，获取完成后，会过滤掉已过期的动态节点。
             List<URL> urls = new ArrayList<URL>();
             Map<String, String> values = jedis.hgetAll(key);
             if (values != null && values.size() > 0) {
                 for (Map.Entry<String, String> entry : values.entrySet()) {
                     URL u = URL.valueOf(entry.getKey());
+                    // 非动态节点，因为动态节点，不受过期的限制
                     if (!u.getParameter(Constants.DYNAMIC_KEY, true)
+                            // 未过期
                             || Long.parseLong(entry.getValue()) >= now) {
+                        // 服务消费者 url 与 服务提供者 url 是否匹配
                         if (UrlUtils.isMatch(url, u)) {
                             urls.add(u);
                         }
                     }
                 }
             }
+            // 若不存在匹配，则创建 `empty://` 的 URL返回，用于清空该服务的该分类。
             if (urls.isEmpty()) {
                 urls.add(url.setProtocol(Constants.EMPTY_PROTOCOL)
                         .setAddress(Constants.ANYHOST_VALUE)
                         .setPath(toServiceName(key))
                         .addParameter(Constants.CATEGORY_KEY, category));
             }
+            // 添加到 result 中。
             result.addAll(urls);
             if (logger.isInfoEnabled()) {
                 logger.info("redis notify: " + key + " = " + urls);
@@ -552,16 +577,33 @@ public class RedisRegistry extends FailbackRegistry {
         if (result == null || result.isEmpty()) {
             return;
         }
+        // 全量数据获取完成时，调用 `super#notify(...)` 方法，回调 NotifyListener
         for (NotifyListener listener : listeners) {
             notify(url, listener, result);
         }
     }
 
+    /**
+     * 获得服务名，从服务路径上
+     *
+     * Service
+     *
+     * @param categoryPath 服务路径
+     * @return 服务名
+     */
     private String toServiceName(String categoryPath) {
         String servicePath = toServicePath(categoryPath);
         return servicePath.startsWith(root) ? servicePath.substring(root.length()) : servicePath;
     }
 
+    /**
+     * 获得分类名，从服务路径上
+     *
+     * Service
+     *
+     * @param categoryPath 服务路径
+     * @return 分类名
+     */
     private String toCategoryName(String categoryPath) {
         int i = categoryPath.lastIndexOf(Constants.PATH_SEPARATOR);
         return i > 0 ? categoryPath.substring(i + 1) : categoryPath;
