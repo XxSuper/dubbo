@@ -55,6 +55,10 @@ public class ExecutorUtil {
         }
         final ExecutorService es = (ExecutorService) executor;
         try {
+            // 禁止提交新任务
+            // 当线程池调用该方法时,线程池的状态则立刻变成SHUTDOWN状态。
+            // 此时，则不能再往线程池中添加任何任务，否则将会抛出RejectedExecutionException异常。
+            // 但是，此时线程池不会立刻退出，直到添加到线程池中的任务都已经处理完成，才会退出。
             // Disable new tasks from being submitted
             es.shutdown();
         } catch (SecurityException ex2) {
@@ -63,14 +67,17 @@ public class ExecutorUtil {
             return;
         }
         try {
+            // 等待现有任务终止
             // Wait a while for existing tasks to terminate
             if (!es.awaitTermination(timeout, TimeUnit.MILLISECONDS)) {
+                // 执行该方法，线程池的状态立刻变成STOP状态，并试图停止所有正在执行的线程，不再处理还在池队列中等待的任务，当然，它会返回那些未执行的任务。
                 es.shutdownNow();
             }
         } catch (InterruptedException ex) {
             es.shutdownNow();
             Thread.currentThread().interrupt();
         }
+        // 如果还没有停止，开启线程池执行关闭
         if (!isTerminated(es)) {
             newThreadToCloseExecutor(es);
         }

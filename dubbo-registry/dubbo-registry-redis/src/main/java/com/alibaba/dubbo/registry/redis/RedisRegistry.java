@@ -56,6 +56,8 @@ import java.util.concurrent.atomic.AtomicInteger;
  *
  * 实现 FailbackRegistry 抽象类，基于 Redis 实现的注册中心实现类。
  *
+ * Redis 主从复制的情况下，从节点的订阅( Subscribe )，可以收到主节点的发布( Publish )
+ *
  */
 public class RedisRegistry extends FailbackRegistry {
 
@@ -209,23 +211,34 @@ public class RedisRegistry extends FailbackRegistry {
         }, expirePeriod / 2, expirePeriod / 2, TimeUnit.MILLISECONDS);
     }
 
+    /**
+     * 延长到期时间
+     */
     private void deferExpired() {
+        // 遍历 JedisPool 集合
         for (Map.Entry<String, JedisPool> entry : jedisPools.entrySet()) {
             JedisPool jedisPool = entry.getValue();
             try {
                 Jedis jedis = jedisPool.getResource();
                 try {
+                    // 循环已注册的 URL 集合
                     for (URL url : new HashSet<URL>(getRegistered())) {
+                        // 动态节点
                         if (url.getParameter(Constants.DYNAMIC_KEY, true)) {
+                            // 获得分类路径
                             String key = toCategoryPath(url);
+                            // 写入 Redis Map 中
                             if (jedis.hset(key, url.toFullString(), String.valueOf(System.currentTimeMillis() + expirePeriod)) == 1) {
+                                // 写入返回的值为 1 ，说明 Map 中该键对应的值不存在（例如，多写 Redis 节点时，有个节点写入失败），发布 `register` 事件。
                                 jedis.publish(key, Constants.REGISTER);
                             }
                         }
                     }
+                    // 监控中心负责删除过期脏数据
                     if (admin) {
                         clean(jedis);
                     }
+                    // 如果服务器端已同步数据，只需写入单台机器
                     if (!replicate) {
                         break;//  If the server side has synchronized data, just write a single machine
                     }
@@ -238,19 +251,26 @@ public class RedisRegistry extends FailbackRegistry {
         }
     }
 
+    // 清理过期脏数据
     // The monitoring center is responsible for deleting outdated dirty data
     private void clean(Jedis jedis) {
+        // 获得所有服务 key
         Set<String> keys = jedis.keys(root + Constants.ANY_VALUE);
         if (keys != null && !keys.isEmpty()) {
+            // 遍历所有的服务 key
             for (String key : keys) {
+                // 获取服务 key 下的 URL 集合
                 Map<String, String> values = jedis.hgetAll(key);
                 if (values != null && values.size() > 0) {
                     boolean delete = false;
                     long now = System.currentTimeMillis();
                     for (Map.Entry<String, String> entry : values.entrySet()) {
                         URL url = URL.valueOf(entry.getKey());
+                        // 动态节点
                         if (url.getParameter(Constants.DYNAMIC_KEY, true)) {
+                            // 获取过期时间
                             long expire = Long.parseLong(entry.getValue());
+                            // 已经过期
                             if (expire < now) {
                                 jedis.hdel(key, entry.getKey());
                                 delete = true;
@@ -260,6 +280,7 @@ public class RedisRegistry extends FailbackRegistry {
                             }
                         }
                     }
+                    // 若删除成功，发布 `unregister` 事件
                     if (delete) {
                         jedis.publish(key, Constants.UNREGISTER);
                     }
@@ -274,6 +295,7 @@ public class RedisRegistry extends FailbackRegistry {
             try {
                 Jedis jedis = jedisPool.getResource();
                 try {
+                    // 至少一个 Redis 节点可用
                     if (jedis.isConnected()) {
                         return true; // At least one single machine is available.
                     }
@@ -288,19 +310,23 @@ public class RedisRegistry extends FailbackRegistry {
 
     @Override
     public void destroy() {
+        // 父类关闭，移除已注册 URL 集合 registered 和订阅 URL 的监听器集合 subscribed
         super.destroy();
         try {
+            // 关闭定时任务
             expireFuture.cancel(true);
         } catch (Throwable t) {
             logger.warn(t.getMessage(), t);
         }
         try {
+            // 关闭通知器
             for (Notifier notifier : notifiers.values()) {
                 notifier.shutdown();
             }
         } catch (Throwable t) {
             logger.warn(t.getMessage(), t);
         }
+        // 关闭 JedisPool 连接池
         for (Map.Entry<String, JedisPool> entry : jedisPools.entrySet()) {
             JedisPool jedisPool = entry.getValue();
             try {
@@ -309,6 +335,7 @@ public class RedisRegistry extends FailbackRegistry {
                 logger.warn("Failed to destroy the redis registry client. registry: " + entry.getKey() + ", cause: " + t.getMessage(), t);
             }
         }
+        // 关闭执行器
         ExecutorUtil.gracefulShutdown(expireExecutor, expirePeriod);
     }
 
@@ -651,6 +678,10 @@ public class RedisRegistry extends FailbackRegistry {
         return toServicePath(url) + Constants.PATH_SEPARATOR + url.getParameter(Constants.CATEGORY_KEY, Constants.DEFAULT_CATEGORY);
     }
 
+    /**
+     * NotifySub 是 RedisRegistry 的内部类，实现 redis.clients.jedis.JedisPubSub 抽象类，通知订阅实现类。
+     * 实现了 #onMessage(key, msg) 和 #onPMessage(pattern, key, msg) 方法，收到 register unregister 事件，调用 #doNotify(jedis, key) 方法，通知监听器，数据变化，从而实现实时更新。
+     */
     private class NotifySub extends JedisPubSub {
 
         private final JedisPool jedisPool;
@@ -702,15 +733,51 @@ public class RedisRegistry extends FailbackRegistry {
 
     }
 
+    /**
+     * Notifier 是 RedisRegistry 的内部类，继承 Thread 类，负责向 Redis 发起订阅逻辑。
+     */
     private class Notifier extends Thread {
 
+        /**
+         * 服务名 Root + Service
+         */
         private final String service;
-        private final AtomicInteger connectSkip = new AtomicInteger();
-        private final AtomicInteger connectSkiped = new AtomicInteger();
-        private final Random random = new Random();
+
+        /**
+         *  Jedis
+         */
         private volatile Jedis jedis;
+
+        /***********   以下属性相当于重连策略，用于和 Redis 断开时，忽略一定次数和 Redis 的连接，避免空跑       ***********/
+
+        /**
+         * 需要忽略连接的次数
+         */
+        private final AtomicInteger connectSkip = new AtomicInteger();
+
+        /**
+         *  已经忽略连接的次数
+         */
+        private final AtomicInteger connectSkiped = new AtomicInteger();
+
+        /**
+         * 随机
+         */
+        private final Random random = new Random();
+
+        /**
+         * 是否首次
+         */
         private volatile boolean first = true;
+
+        /**
+         * 是否运行中
+         */
         private volatile boolean running = true;
+
+        /**
+         * 连接次数随机数
+         */
         private volatile int connectRandom;
 
         public Notifier(String service) {
@@ -719,13 +786,23 @@ public class RedisRegistry extends FailbackRegistry {
             this.service = service;
         }
 
+        /**
+         * 重置忽略连接的信息
+         */
         private void resetSkip() {
+            // 重置需要忽略连接的次数
             connectSkip.set(0);
+            // 重置已忽略次数和随机数
             connectSkiped.set(0);
             connectRandom = 0;
         }
 
+        /**
+         * 判断是否忽略本次对 Redis 的连接
+         * @return
+         */
         private boolean isSkip() {
+            // 获得需要忽略连接的总次数。如果超过 10 ，则加上一个 10 以内的随机数。思路是，连接失败的次数越多，每一轮加大需要忽略的总次数，并且带有一定的随机性。
             int skip = connectSkip.get(); // Growth of skipping times
             if (skip >= 10) { // If the number of skipping times increases by more than 10, take the random number
                 if (connectRandom == 0) {
@@ -733,26 +810,35 @@ public class RedisRegistry extends FailbackRegistry {
                 }
                 skip = 10 + connectRandom;
             }
+            // 自增忽略次数。若忽略次数不够，则继续忽略，即返回 true。
             if (connectSkiped.getAndIncrement() < skip) { // Check the number of skipping times
                 return true;
             }
+            // 增加需要忽略的次数。也就是说，下一轮，不考虑随机数，会多一次。
             connectSkip.incrementAndGet();
+            // 已忽略次数重置
             connectSkiped.set(0);
+            // 连接随机数重置
             connectRandom = 0;
             return false;
         }
 
         @Override
         public void run() {
+            // 循环执行，直到关闭。
             while (running) {
                 try {
+                    // 是否跳过本次 Redis 连接，即使跳过，也没有执行类似 sleep 的逻辑，有点奇怪。这样，会导致实际即使跳过，也会快速向 Redis 发起订阅。
                     if (!isSkip()) {
                         try {
+                            // 循环连接池，发起订阅，直到一个成功。
                             for (Map.Entry<String, JedisPool> entry : jedisPools.entrySet()) {
                                 JedisPool jedisPool = entry.getValue();
                                 try {
+                                    // 获取 jedis
                                     jedis = jedisPool.getResource();
                                     try {
+                                        // 监控中心
                                         if (service.endsWith(Constants.ANY_VALUE)) {
                                             if (!first) {
                                                 first = false;
@@ -762,15 +848,20 @@ public class RedisRegistry extends FailbackRegistry {
                                                         doNotify(jedis, s);
                                                     }
                                                 }
+                                                // 重置忽略连接的信息
                                                 resetSkip();
                                             }
+                                            // 批订阅
                                             jedis.psubscribe(new NotifySub(jedisPool), service); // blocking
+                                        // 服务提供者或消费者
                                         } else {
                                             if (!first) {
                                                 first = false;
                                                 doNotify(jedis, service);
+                                                // 重置忽略连接的信息
                                                 resetSkip();
                                             }
+                                            // 批订阅
                                             jedis.psubscribe(new NotifySub(jedisPool), service + Constants.PATH_SEPARATOR + Constants.ANY_VALUE); // blocking
                                         }
                                         break;
@@ -796,7 +887,9 @@ public class RedisRegistry extends FailbackRegistry {
 
         public void shutdown() {
             try {
+                // 停止运行
                 running = false;
+                // Jedis 断开连接
                 jedis.disconnect();
             } catch (Throwable t) {
                 logger.warn(t.getMessage(), t);
