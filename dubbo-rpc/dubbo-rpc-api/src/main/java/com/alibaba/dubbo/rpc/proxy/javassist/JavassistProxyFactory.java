@@ -26,19 +26,24 @@ import com.alibaba.dubbo.rpc.proxy.InvokerInvocationHandler;
 
 /**
  * JavaassistRpcProxyFactory
+ * 实现 AbstractProxyFactory 抽象类，基于 Javassist 代理工厂实现类。
  */
 public class JavassistProxyFactory extends AbstractProxyFactory {
 
     @Override
     @SuppressWarnings("unchecked")
     public <T> T getProxy(Invoker<T> invoker, Class<?>[] interfaces) {
+        // 调用 Proxy#getProxy(interface) 方法，获得 Proxy 对象
+        // 调用 Proxy#newInstance(InvocationHandler) 方法，获得 proxy 对象。其中传入的参数是 InvokerInvocationHandler 类，通过这样的方式，让 proxy 和真正的逻辑代码解耦
         return (T) Proxy.getProxy(interfaces).newInstance(new InvokerInvocationHandler(invoker));
     }
 
     @Override
     public <T> Invoker<T> getInvoker(T proxy, Class<T> type, URL url) {
         // TODO Wrapper cannot handle this scenario correctly: the classname contains '$'
+        // 调用 Wrapper#getWrapper(Class<?>) 方法，获得 Wrapper 对象
         final Wrapper wrapper = Wrapper.getWrapper(proxy.getClass().getName().indexOf('$') < 0 ? proxy.getClass() : type);
+        // 创建 AbstractProxyInvoker 对象，实现 #doInvoke(...) 方法。在该方法中，调用 Wrapper#invokeMethod(...) 方法，从而调用 Service 的方法。
         return new AbstractProxyInvoker<T>(proxy, type, url) {
             @Override
             protected Object doInvoke(T proxy, String methodName,
