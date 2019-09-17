@@ -388,6 +388,7 @@ public abstract class AbstractInterfaceConfig extends AbstractMethodConfig {
     }
 
     void checkStub(Class<?> interfaceClass) {
+        // `local` 配置项的校验，和 `stub` 一样。
         if (ConfigUtils.isNotEmpty(local)) {
             // local不为空，并且是默认的，取 接口名+local 加载，如果不为默认取 local 作为类名加载
             Class<?> localClass = ConfigUtils.isDefault(local) ? ReflectUtils.forName(interfaceClass.getName() + "Local") : ReflectUtils.forName(local);
@@ -401,14 +402,16 @@ public abstract class AbstractInterfaceConfig extends AbstractMethodConfig {
                 throw new IllegalStateException("No such constructor \"public " + localClass.getSimpleName() + "(" + interfaceClass.getName() + ")\" in local implementation class " + localClass.getName());
             }
         }
+        // `stub` 配置项的校验
         if (ConfigUtils.isNotEmpty(stub)) {
             // stub不为空，并且是默认的，取 接口名+stub 加载，如果不为默认取 stub 作为类名加载
             Class<?> localClass = ConfigUtils.isDefault(stub) ? ReflectUtils.forName(interfaceClass.getName() + "Stub") : ReflectUtils.forName(stub);
-            // interfaceClass 是否为 localClass类的父类
+            // interfaceClass 是否为 localClass类的父类，Stub 类，必须实现服务接口
             if (!interfaceClass.isAssignableFrom(localClass)) {
                 throw new IllegalStateException("The local implementation class " + localClass.getName() + " not implement interface " + interfaceClass.getName());
             }
             try {
+                // Stub 类，必须带有服务接口的构造方法
                 ReflectUtils.findConstructor(localClass, interfaceClass);
             } catch (NoSuchMethodException e) {
                 throw new IllegalStateException("No such constructor \"public " + localClass.getSimpleName() + "(" + interfaceClass.getName() + ")\" in local implementation class " + localClass.getName());
