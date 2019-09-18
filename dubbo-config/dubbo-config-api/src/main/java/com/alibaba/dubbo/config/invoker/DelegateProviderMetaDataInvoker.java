@@ -13,6 +13,8 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
+ *
+ * 带有服务提供者配置 ServiceConfig 的 Invoker 对象。
  */
 package com.alibaba.dubbo.config.invoker;
 
@@ -24,7 +26,14 @@ import com.alibaba.dubbo.rpc.Result;
 import com.alibaba.dubbo.rpc.RpcException;
 
 public class DelegateProviderMetaDataInvoker<T> implements Invoker {
+    /**
+     * Invoker 对象
+     */
     protected final Invoker<T> invoker;
+
+    /**
+     * 服务提供者配置
+     */
     private ServiceConfig metadata;
 
     public DelegateProviderMetaDataInvoker(Invoker<T> invoker,ServiceConfig metadata) {

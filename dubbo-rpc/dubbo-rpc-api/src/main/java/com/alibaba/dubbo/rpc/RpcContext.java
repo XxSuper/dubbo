@@ -41,6 +41,9 @@ import java.util.concurrent.TimeoutException;
  * For example: A invokes B, then B invokes C. On service B, RpcContext saves invocation info from A to B before B
  * starts invoking C, and saves invocation info from B to C after B invokes C.
  *
+ * 注意：RpcContext 是一个临时状态记录器，当接收到 RPC 请求，或发起 RPC 请求时，RpcContext 的状态都会变化。
+ * 比如：A 调 B，B 再调 C，则 B 机器上，在 B 调 C 之前，RpcContext 记录的是 A 调 B 的信息，在 B 调 C 之后，RpcContext 记录的是 B 调 C 的信息。
+ *
  * @export
  * @see com.alibaba.dubbo.rpc.filter.ContextFilter
  */

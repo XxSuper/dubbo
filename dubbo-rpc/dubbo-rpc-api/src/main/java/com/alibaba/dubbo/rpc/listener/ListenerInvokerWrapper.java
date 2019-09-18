@@ -30,7 +30,7 @@ import java.util.List;
 /**
  * ListenerInvoker
  *
- * 实现 Invoker 接口，具有监听器功能的 Invoker 包装器
+ * 实现 Invoker 接口，具有监听器功能的 Invoker 包装器，主要目的是为了 InvokerListener 的触发
  */
 public class ListenerInvokerWrapper<T> implements Invoker<T> {
 

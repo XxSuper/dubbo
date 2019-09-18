@@ -147,11 +147,14 @@ public abstract class AbstractInvoker<T> implements Invoker<T> {
                     + ", dubbo version is " + Version.getVersion() + ", this invoker should not be used any longer");
         }
 
+        // 设置 `invoker` 属性，Invoker 是层层嵌套，只要到了这里才是真正的 Invoker 对象。
         RpcInvocation invocation = (RpcInvocation) inv;
         invocation.setInvoker(this);
+        // 添加公用的隐式传参，例如，`path` `interface` 等等，详见 RpcInvocation 类。
         if (attachment != null && attachment.size() > 0) {
             invocation.addAttachmentsIfAbsent(attachment);
         }
+        // 添加自定义的隐式传参，从 RpcContext.attachments 中
         Map<String, String> contextAttachments = RpcContext.getContext().getAttachments();
         if (contextAttachments != null && contextAttachments.size() != 0) {
             /**
@@ -162,6 +165,7 @@ public abstract class AbstractInvoker<T> implements Invoker<T> {
              */
             invocation.addAttachments(contextAttachments);
         }
+        // 设置 `async=true` ，若为异步方法
         if (getUrl().getMethodParameter(invocation.getMethodName(), Constants.ASYNC_KEY, false)) {
             invocation.setAttachment(Constants.ASYNC_KEY, Boolean.TRUE.toString());
         }
@@ -169,6 +173,7 @@ public abstract class AbstractInvoker<T> implements Invoker<T> {
 
 
         try {
+            // 执行调用
             return doInvoke(invocation);
         } catch (InvocationTargetException e) { // biz exception
             Throwable te = e.getTargetException();

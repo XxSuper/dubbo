@@ -77,7 +77,9 @@ class InjvmInvoker<T> extends AbstractInvoker<T> {
         if (exporter == null) {
             throw new RpcException("Service [" + key + "] not found.");
         }
+        // 设置服务提供者地址为本地
         RpcContext.getContext().setRemoteAddress(NetUtils.LOCALHOST, 0);
+        // 调用
         return exporter.getInvoker().invoke(invocation);
     }
 }
