@@ -43,18 +43,58 @@ import static com.alibaba.dubbo.rpc.protocol.dubbo.CallbackServiceCodec.encodeIn
 
 /**
  * Dubbo codec.
+ * 实现 Codec2 接口，继承 ExchangeCodec 类，Dubbo 编解码器实现类。
  */
 public class DubboCodec extends ExchangeCodec implements Codec2 {
 
+    /**
+     * 协议名
+     */
     public static final String NAME = "dubbo";
+
+    /**
+     * 协议版本
+     */
     public static final String DUBBO_VERSION = Version.getProtocolVersion();
+
+    /**
+     * 响应 - 异常
+     */
     public static final byte RESPONSE_WITH_EXCEPTION = 0;
+
+    /**
+     * 响应 - 正常（有返回）
+     */
     public static final byte RESPONSE_VALUE = 1;
+
+    /**
+     * 响应 - 正常（空返回）
+     */
     public static final byte RESPONSE_NULL_VALUE = 2;
+
+    /**
+     * 响应 - 异常带隐式属性
+     */
     public static final byte RESPONSE_WITH_EXCEPTION_WITH_ATTACHMENTS = 3;
+
+    /**
+     * 响应 - 正常（有返回）带隐式属性
+     */
     public static final byte RESPONSE_VALUE_WITH_ATTACHMENTS = 4;
+
+    /**
+     * 响应 - 正常（空返回）带隐式属性
+     */
     public static final byte RESPONSE_NULL_VALUE_WITH_ATTACHMENTS = 5;
+
+    /**
+     * 方法参数 - 空（参数）
+     */
     public static final Object[] EMPTY_OBJECT_ARRAY = new Object[0];
+
+    /**
+     * 方法参数 - 空（类型）
+     */
     public static final Class<?>[] EMPTY_CLASS_ARRAY = new Class<?>[0];
     private static final Logger log = LoggerFactory.getLogger(DubboCodec.class);
 
@@ -167,38 +207,62 @@ public class DubboCodec extends ExchangeCodec implements Codec2 {
         encodeResponseData(channel, out, data, DUBBO_VERSION);
     }
 
+    /**
+     * 编码 RpcInvocation 对象，写入需要编码的字段。对应的解码，在 DecodeableRpcInvocation 中。
+     * @param channel
+     * @param out
+     * @param data
+     * @param version
+     * @throws IOException
+     */
     @Override
     protected void encodeRequestData(Channel channel, ObjectOutput out, Object data, String version) throws IOException {
         RpcInvocation inv = (RpcInvocation) data;
 
+        // 写入 `dubbo` `path` `version`
         out.writeUTF(version);
         out.writeUTF(inv.getAttachment(Constants.PATH_KEY));
         out.writeUTF(inv.getAttachment(Constants.VERSION_KEY));
 
+        // 写入方法、方法签名、方法参数集合
         out.writeUTF(inv.getMethodName());
         out.writeUTF(ReflectUtils.getDesc(inv.getParameterTypes()));
         Object[] args = inv.getArguments();
         if (args != null)
             for (int i = 0; i < args.length; i++) {
+                // 调用 CallbackServiceCodec#encodeInvocationArgument(...) 方法，编码参数。主要用于 参数回调 功能。
                 out.writeObject(encodeInvocationArgument(channel, inv, i));
             }
+        // 写入隐式传参集合
         out.writeObject(inv.getAttachments());
     }
 
+    /**
+     * 编码 Result 对象，写入需要编码的字段。对应的解码，在 DecodeableRpcResult 中。
+     * @param channel
+     * @param out
+     * @param data
+     * @param version
+     * @throws IOException
+     */
     @Override
     protected void encodeResponseData(Channel channel, ObjectOutput out, Object data, String version) throws IOException {
         Result result = (Result) data;
         // currently, the version value in Response records the version of Request
+        // 是否带隐式属性
         boolean attach = Version.isSupportResponseAttatchment(version);
         Throwable th = result.getException();
+        // 正常
         if (th == null) {
             Object ret = result.getValue();
+            // 空返回
             if (ret == null) {
                 out.writeByte(attach ? RESPONSE_NULL_VALUE_WITH_ATTACHMENTS : RESPONSE_NULL_VALUE);
             } else {
                 out.writeByte(attach ? RESPONSE_VALUE_WITH_ATTACHMENTS : RESPONSE_VALUE);
                 out.writeObject(ret);
             }
+        // 异常
         } else {
             out.writeByte(attach ? RESPONSE_WITH_EXCEPTION_WITH_ATTACHMENTS : RESPONSE_WITH_EXCEPTION);
             out.writeObject(th);
@@ -206,6 +270,7 @@ public class DubboCodec extends ExchangeCodec implements Codec2 {
 
         if (attach) {
             // returns current version of Response to consumer side.
+            // 将响应的当前版本返回给 consumer 端。
             result.getAttachments().put(Constants.DUBBO_VERSION_KEY, Version.getProtocolVersion());
             out.writeObject(result.getAttachments());
         }

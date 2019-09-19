@@ -29,33 +29,59 @@ import com.alibaba.dubbo.rpc.RpcResult;
 
 import java.io.IOException;
 
+/**
+ * DubboCountCodec
+ * 实现 Codec2 接口，支持多消息的编解码器。
+ */
 public final class DubboCountCodec implements Codec2 {
 
+    /**
+     * 编解码器
+     */
     private DubboCodec codec = new DubboCodec();
 
     @Override
     public void encode(Channel channel, ChannelBuffer buffer, Object msg) throws IOException {
+        // 编码
         codec.encode(channel, buffer, msg);
     }
 
+    /**
+     * 1）多消息解析的支持。2）记录每条消息的长度，用于 MonitorFilter 监控。
+     * @param channel
+     * @param buffer
+     * @return
+     * @throws IOException
+     */
     @Override
     public Object decode(Channel channel, ChannelBuffer buffer) throws IOException {
+        // 记录当前读位置
         int save = buffer.readerIndex();
+        // 创建 MultiMessage 对象。MultiMessageHandler 支持对它的处理分发。
         MultiMessage result = MultiMessage.create();
+        // 循环解析消息，直到结束。
         do {
+            // 解码
             Object obj = codec.decode(channel, buffer);
+            // 字节数组不够，重置读进度，结束解析。
             if (Codec2.DecodeResult.NEED_MORE_INPUT == obj) {
                 buffer.readerIndex(save);
                 break;
+            // 解析到消息
             } else {
+                // 添加结果消息
                 result.addMessage(obj);
+                // 记录消息长度到隐式参数集合，用于 MonitorFilter 监控
                 logMessageLength(obj, buffer.readerIndex() - save);
+                // 记录当前读位置，用于计算下一条消息的长度。
                 save = buffer.readerIndex();
             }
         } while (true);
+        // 需要更多的输入
         if (result.isEmpty()) {
             return Codec2.DecodeResult.NEED_MORE_INPUT;
         }
+        // 返回解析到的消息
         if (result.size() == 1) {
             return result.get(0);
         }
@@ -68,6 +94,7 @@ public final class DubboCountCodec implements Codec2 {
         }
         if (result instanceof Request) {
             try {
+                // 请求
                 ((RpcInvocation) ((Request) result).getData()).setAttachment(
                         Constants.INPUT_KEY, String.valueOf(bytes));
             } catch (Throwable e) {
@@ -75,6 +102,7 @@ public final class DubboCountCodec implements Codec2 {
             }
         } else if (result instanceof Response) {
             try {
+                // 响应
                 ((RpcResult) ((Response) result).getResult()).setAttachment(
                         Constants.OUTPUT_KEY, String.valueOf(bytes));
             } catch (Throwable e) {

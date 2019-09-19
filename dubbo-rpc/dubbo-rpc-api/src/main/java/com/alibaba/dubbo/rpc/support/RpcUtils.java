@@ -62,10 +62,14 @@ public class RpcUtils {
             if (invocation != null && invocation.getInvoker() != null
                     && invocation.getInvoker().getUrl() != null
                     && !invocation.getMethodName().startsWith("$")) {
+                // 获取服务接口名
                 String service = invocation.getInvoker().getUrl().getServiceInterface();
                 if (service != null && service.length() > 0) {
+                    // 获取服务 class
                     Class<?> cls = ReflectUtils.forName(service);
+                    // 获取 method
                     Method method = cls.getMethod(invocation.getMethodName(), invocation.getParameterTypes());
+                    // 获取返回类型
                     if (method.getReturnType() == void.class) {
                         return null;
                     }

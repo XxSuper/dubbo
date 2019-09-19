@@ -80,6 +80,7 @@ class CallbackServiceCodec {
     private static String exportOrunexportCallbackService(Channel channel, URL url, Class clazz, Object inst, Boolean export) throws IOException {
         int instid = System.identityHashCode(inst);
 
+        // 添加 isserver、is_callback_service、group、methods
         Map<String, String> params = new HashMap<String, String>(3);
         // no need to new client again
         params.put(Constants.IS_SERVER_KEY, Boolean.FALSE.toString());
@@ -92,6 +93,7 @@ class CallbackServiceCodec {
         // add method, for verifying against method, automatic fallback (see dubbo protocol)
         params.put(Constants.METHODS_KEY, StringUtils.join(Wrapper.getWrapper(clazz).getDeclaredMethodNames(), ","));
 
+        // 添加 params 到 tmpmap 中，移除 version、添加 interface
         Map<String, String> tmpmap = new HashMap<String, String>(url.getParameters());
         tmpmap.putAll(params);
         tmpmap.remove(Constants.VERSION_KEY);// doesn't need to distinguish version for callback
@@ -99,26 +101,37 @@ class CallbackServiceCodec {
         URL exporturl = new URL(DubboProtocol.NAME, channel.getLocalAddress().getAddress().getHostAddress(), channel.getLocalAddress().getPort(), clazz.getName() + "." + instid, tmpmap);
 
         // no need to generate multiple exporters for different channel in the same JVM, cache key cannot collide.
+        // 不需要为同一个 jvm 中的不同 channel 生成多个export，缓存 key 不能冲突。
         String cacheKey = getClientSideCallbackServiceCacheKey(instid);
         String countkey = getClientSideCountKey(clazz.getName());
         if (export) {
             // one channel can have multiple callback instances, no need to re-export for different instance.
+            // 一个 channel 可以有多个回调实例，不需要为不同实例重新export。
             if (!channel.hasAttribute(cacheKey)) {
+                // 是否实例超过限制
                 if (!isInstancesOverLimit(channel, url, clazz.getName(), instid, false)) {
+                    // 获取 invoker
                     Invoker<?> invoker = proxyFactory.getInvoker(inst, clazz, exporturl);
-                    // should destroy resource?
+                    // should destroy resource? 生成 exporter
                     Exporter<?> exporter = protocol.export(invoker);
                     // this is used for tracing if instid has published service or not.
+                    // 这用于跟踪 instd 是否发布了服务。
                     channel.setAttribute(cacheKey, exporter);
                     logger.info("export a callback service :" + exporturl + ", on " + channel + ", url is: " + url);
+                    // 设置创建实例数量
                     increaseInstanceCount(channel, countkey);
                 }
             }
         } else {
+            // 有 cacheKey 属性
             if (channel.hasAttribute(cacheKey)) {
+                // 获取 exporter
                 Exporter<?> exporter = (Exporter<?>) channel.getAttribute(cacheKey);
+                // 取消导出
                 exporter.unexport();
+                // 删除 cacheKey 属性
                 channel.removeAttribute(cacheKey);
+                // 减少创建实例数量
                 decreaseInstanceCount(channel, countkey);
             }
         }

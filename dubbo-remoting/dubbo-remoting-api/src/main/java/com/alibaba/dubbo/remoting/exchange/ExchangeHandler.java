@@ -22,6 +22,7 @@ import com.alibaba.dubbo.remoting.telnet.TelnetHandler;
 
 /**
  * ExchangeHandler. (API, Prototype, ThreadSafe)
+ * 这个处理器，负责将请求，转发到对应的 Invoker 对象，执行逻辑，返回结果。
  */
 public interface ExchangeHandler extends ChannelHandler, TelnetHandler {
 
