@@ -34,7 +34,10 @@ public interface Codec2 {
 
 
     enum DecodeResult {
-        NEED_MORE_INPUT, SKIP_SOME_INPUT
+        // 收到的字节流不是一个完整数据包，需要等待更多数据到达
+        NEED_MORE_INPUT,
+        // 忽略掉一部分数据包
+        SKIP_SOME_INPUT
     }
 
 }

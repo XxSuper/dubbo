@@ -41,7 +41,7 @@ import static com.alibaba.dubbo.rpc.protocol.dubbo.CallbackServiceCodec.decodeIn
 
 /**
  * DecodeableRpcInvocation
- * 实现 Codec 和 Decodeable 接口，继承 RpcInvocation 类，可解码的 RpcInvocation 实现类。
+ * 实现 Codec 和 Decodeable 接口，继承 RpcInvocation 类，可解码的 RpcInvocation 实现类
  * 当服务消费者，调用服务提供者，前者编码的 RpcInvocation 对象，后者解码成 DecodeableRpcInvocation 对象。
  */
 public class DecodeableRpcInvocation extends RpcInvocation implements Codec, Decodeable {
@@ -121,11 +121,11 @@ public class DecodeableRpcInvocation extends RpcInvocation implements Codec, Dec
         setAttachment(Constants.PATH_KEY, in.readUTF());
         setAttachment(Constants.VERSION_KEY, in.readUTF());
 
-        // 解码方法、方法签名、方法参数集合
         setMethodName(in.readUTF());
         try {
             Object[] args;
             Class<?>[] pts;
+            // 方法签名、方法参数集合
             String desc = in.readUTF();
             if (desc.length() == 0) {
                 pts = DubboCodec.EMPTY_CLASS_ARRAY;
@@ -135,6 +135,7 @@ public class DecodeableRpcInvocation extends RpcInvocation implements Codec, Dec
                 args = new Object[pts.length];
                 for (int i = 0; i < args.length; i++) {
                     try {
+                        // 解码方法参数值
                         args[i] = in.readObject(pts[i]);
                     } catch (Exception e) {
                         if (log.isWarnEnabled()) {
@@ -153,15 +154,14 @@ public class DecodeableRpcInvocation extends RpcInvocation implements Codec, Dec
                     attachment = new HashMap<String, String>();
                 }
                 attachment.putAll(map);
-                // 设置 attachments
                 setAttachments(attachment);
             }
             //decode argument ,may be callback
-            // 进一步解码方法参数，主要为了参数返回
+            // 进一步解码方法参数，主要为了参数返回 TODO
             for (int i = 0; i < args.length; i++) {
                 args[i] = decodeInvocationArgument(channel, this, pts, i, args[i]);
             }
-
+            // 设置请求参数
             // 设置 arguments
             setArguments(args);
 

@@ -44,6 +44,37 @@ import static com.alibaba.dubbo.rpc.protocol.dubbo.CallbackServiceCodec.encodeIn
 /**
  * Dubbo codec.
  * 实现 Codec2 接口，继承 ExchangeCodec 类，Dubbo 编解码器实现类。
+ *
+ * dubbo 协议采用固定长度的消息头（16字节）和不定长度的消息体来进行数据传输，消息头定义了一些通讯框架netty在IO线程处理时需要的信息。具体dubbo协议的报文格式如下：
+ *
+ * 消息头报文格式：
+ * +----------------------------------------------------------------------------------------------------------------------------------------------------------------+
+ * |                                                                                                                                                                |
+ * |                                                                              DUBBO Protocol                                                                    |
+ * |                                                                                                                                                                |
+ * +----------------------------------------------------------------------------------------------------------------------------------------------------------------+
+ * |              |             |         |            |         |                     |              |                   |                                         |
+ * |     0-7      |     8-15    |    16   |     17     |    18   |        19-23        |     24-31    |       32-95       |                   96-127                |
+ * |              |             |         |            |         |                     |              |                   |                                         |
+ * +----------------------------------------------------------------------------------------------------------------------------------------------------------------+
+ * |              |             |                                                      |              |                   |                                         |
+ * |    1byte     |    1byte    |                        1byte                         |     1byte    |       8byte       |                     4byte               |
+ * |              |             |                                                      |              |                   |                                         |
+ * +----------------------------------------------------------------------------------------------------------------------------------------------------------------+
+ * |              |             |         |            |         |                     |              |                   |                                         |
+ * |  MAGIC-HIGH  |  MAGIC-LOW  | REQUEST |  TWOWAY    |   EVENT |   Serialization Id  |  status      | 请求序号Invoke ID  |           消息总长度 Body Length         |
+ * |              |             |         |            |         |                     |              |                   |                                         |
+ * +----------------------------------------------------------------------------------------------------------------------------------------------------------------+
+ * |                            |                                                      |              |                   |                                         |
+ * |           MAGIC            |                            FLAG                      |    Status    |     Invoke ID     |              Body Length                |
+ * |                            |                                                      |              |                   |                                         |
+ * +----------------------------------------------------------------------------------------------------------------------------------------------------------------+
+ *
+ * magic：2字节的魔数。类似 java 字节码文件里的魔数，用来判断是不是 dubbo 协议的数据包。魔数是常量0xdabb，用于判断报文的开始。
+ * flag：标志位，一共8个地址位。低四位用来表示消息体数据用的序列化工具的类型（默认hessian），高四位中，第一位为1表示是request请求，第二位为1表示双向传输（即有返回response），第三位为1表示是心跳ping事件。
+ * status：状态位, 设置请求响应状态，dubbo定义了一些响应的类型。
+ * invoke id：消息id, long 类型。每一个请求的唯一识别id（由于采用异步通讯的方式，用来把请求request和返回的response对应上）
+ * body length：消息体 body 长度, int 类型，即记录Body Content有多少个字节。
  */
 public class DubboCodec extends ExchangeCodec implements Codec2 {
 
@@ -100,28 +131,38 @@ public class DubboCodec extends ExchangeCodec implements Codec2 {
 
     @Override
     protected Object decodeBody(Channel channel, InputStream is, byte[] header) throws IOException {
+        // 读取消息标记位和协议类型
         byte flag = header[2], proto = (byte) (flag & SERIALIZATION_MASK);
-        // get request id.
+        // get request id. 读取请求id
         long id = Bytes.bytes2long(header, 4);
+        // 解析响应
         if ((flag & FLAG_REQUEST) == 0) {
-            // decode response.
+            // decode response. 客户端对响应进行解码
             Response res = new Response(id);
+            // // 若是心跳事件，进行设置
             if ((flag & FLAG_EVENT) != 0) {
                 res.setEvent(Response.HEARTBEAT_EVENT);
             }
-            // get status.
+            // get status. 设置状态
             byte status = header[3];
             res.setStatus(status);
             try {
+                // 获取序列化协议，对输入数据进行解码，这里会根据序列化协议 id 和名称来校验序列化协议是否合法
                 ObjectInput in = CodecSupport.deserialize(channel.getUrl(), is, proto);
+                // 正常响应状态
                 if (status == Response.OK) {
                     Object data;
                     if (res.isHeartbeat()) {
+                        // 解码心跳事件
                         data = decodeHeartbeatData(channel, in);
                     } else if (res.isEvent()) {
+                        // 解码其它事件
                         data = decodeEventData(channel, in);
                     } else {
+                        // 解码普通响应
                         DecodeableRpcResult result;
+                        // 根据decode.in.io的配置决定何时进行解码
+                        // 在通信框架（例如，Netty）的 IO 线程，解码
                         if (channel.getUrl().getParameter(
                                 Constants.DECODE_IN_IO_THREAD_KEY,
                                 Constants.DEFAULT_DECODE_IN_IO_THREAD)) {
@@ -129,12 +170,14 @@ public class DubboCodec extends ExchangeCodec implements Codec2 {
                                     (Invocation) getRequestData(id), proto);
                             result.decode();
                         } else {
+                            // 在 Dubbo ThreadPool 线程，解码，使用 DecodeHandler
                             result = new DecodeableRpcResult(channel, res,
                                     new UnsafeByteArrayInputStream(readMessageData(is)),
                                     (Invocation) getRequestData(id), proto);
                         }
                         data = result;
                     }
+                    // 设置结果
                     res.setResult(data);
                 } else {
                     res.setErrorMessage(in.readUTF());
@@ -148,28 +191,34 @@ public class DubboCodec extends ExchangeCodec implements Codec2 {
             }
             return res;
         } else {
-            // decode request.
+            // decode request. 服务端对请求进行解码
             Request req = new Request(id);
             req.setVersion(Version.getProtocolVersion());
+            // 是否需要响应
             req.setTwoWay((flag & FLAG_TWOWAY) != 0);
+            // 若是心跳事件，进行设置
             if ((flag & FLAG_EVENT) != 0) {
                 req.setEvent(Request.HEARTBEAT_EVENT);
             }
             try {
                 Object data;
                 ObjectInput in = CodecSupport.deserialize(channel.getUrl(), is, proto);
+                // 解码心跳事件
                 if (req.isHeartbeat()) {
                     data = decodeHeartbeatData(channel, in);
                 } else if (req.isEvent()) {
+                    // 解码其它事件
                     data = decodeEventData(channel, in);
                 } else {
                     DecodeableRpcInvocation inv;
+                    // 在通信框架（例如，Netty）的 IO 线程，解码
                     if (channel.getUrl().getParameter(
                             Constants.DECODE_IN_IO_THREAD_KEY,
                             Constants.DEFAULT_DECODE_IN_IO_THREAD)) {
                         inv = new DecodeableRpcInvocation(channel, req, is, proto);
                         inv.decode();
                     } else {
+                        // 在 Dubbo ThreadPool 线程，解码，使用 DecodeHandler
                         inv = new DecodeableRpcInvocation(channel, req,
                                 new UnsafeByteArrayInputStream(readMessageData(is)), proto);
                     }
@@ -209,6 +258,7 @@ public class DubboCodec extends ExchangeCodec implements Codec2 {
 
     /**
      * 编码 RpcInvocation 对象，写入需要编码的字段。对应的解码，在 DecodeableRpcInvocation 中。
+     * 在对请求进行编码时，会把版本号、服务路径、方法名、方法参数等信息都进行编码，其中参数类型是用JVM中的类型表示方法来编码的。
      * @param channel
      * @param out
      * @param data
@@ -249,7 +299,7 @@ public class DubboCodec extends ExchangeCodec implements Codec2 {
     protected void encodeResponseData(Channel channel, ObjectOutput out, Object data, String version) throws IOException {
         Result result = (Result) data;
         // currently, the version value in Response records the version of Request
-        // 是否带隐式属性
+        // 2.0.2之后版本的响应中，才会存在附加属性，这里会根据版本号来判断是否需要将附加属性进行编码
         boolean attach = Version.isSupportResponseAttatchment(version);
         Throwable th = result.getException();
         // 正常
@@ -259,11 +309,12 @@ public class DubboCodec extends ExchangeCodec implements Codec2 {
             if (ret == null) {
                 out.writeByte(attach ? RESPONSE_NULL_VALUE_WITH_ATTACHMENTS : RESPONSE_NULL_VALUE);
             } else {
+                // 有返回
                 out.writeByte(attach ? RESPONSE_VALUE_WITH_ATTACHMENTS : RESPONSE_VALUE);
                 out.writeObject(ret);
             }
-        // 异常
         } else {
+            // 异常
             out.writeByte(attach ? RESPONSE_WITH_EXCEPTION_WITH_ATTACHMENTS : RESPONSE_WITH_EXCEPTION);
             out.writeObject(th);
         }

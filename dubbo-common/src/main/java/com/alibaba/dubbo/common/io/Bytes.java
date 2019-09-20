@@ -336,7 +336,7 @@ public class Bytes {
      * @param off offset.
      * @return long.
      */
-    public static long bytes2long(byte[] b, int off) {
+    public static long bytes2long(byte[] b, int off) {// 0xFFL 十进制 255 二进制 11111111 long 类型 8个字节 64位，将8个字节拆开了
         return ((b[off + 7] & 0xFFL) << 0) +
                 ((b[off + 6] & 0xFFL) << 8) +
                 ((b[off + 5] & 0xFFL) << 16) +

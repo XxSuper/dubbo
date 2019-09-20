@@ -42,7 +42,6 @@ public final class DubboCountCodec implements Codec2 {
 
     @Override
     public void encode(Channel channel, ChannelBuffer buffer, Object msg) throws IOException {
-        // 编码
         codec.encode(channel, buffer, msg);
     }
 
@@ -55,7 +54,7 @@ public final class DubboCountCodec implements Codec2 {
      */
     @Override
     public Object decode(Channel channel, ChannelBuffer buffer) throws IOException {
-        // 记录当前读位置
+        // 记录当前读位置，用于下面计算每条消息的长度。
         int save = buffer.readerIndex();
         // 创建 MultiMessage 对象。MultiMessageHandler 支持对它的处理分发。
         MultiMessage result = MultiMessage.create();
@@ -92,17 +91,17 @@ public final class DubboCountCodec implements Codec2 {
         if (bytes <= 0) {
             return;
         }
+        // 请求
         if (result instanceof Request) {
             try {
-                // 请求
                 ((RpcInvocation) ((Request) result).getData()).setAttachment(
                         Constants.INPUT_KEY, String.valueOf(bytes));
             } catch (Throwable e) {
                 /* ignore */
             }
+        // 响应
         } else if (result instanceof Response) {
             try {
-                // 响应
                 ((RpcResult) ((Response) result).getResult()).setAttachment(
                         Constants.OUTPUT_KEY, String.valueOf(bytes));
             } catch (Throwable e) {
