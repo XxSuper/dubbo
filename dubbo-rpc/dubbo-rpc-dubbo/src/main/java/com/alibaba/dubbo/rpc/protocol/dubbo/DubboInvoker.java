@@ -120,6 +120,11 @@ public class DubboInvoker<T> extends AbstractInvoker<T> {
             // 异步调用
             } else if (isAsync) {
                 // 调用 ExchangeClient#request(invocation, timeout) 方法，发送请求。
+                // currentClient 在 DubboProtocal 中进行初始化，实际实现对象为 HeaderExchangeClient 对象
+                // currentClient.request(Object request, int timeout) 实际调用的是 HeaderExchangeClient 对象的 request(Object request, int timeout) 方法
+                // HeaderExchangeClient.request(Object request, int timeout) 方法再调用 HeaderExchangeChannel 的 request(Object request, int timeout) 方法
+                // HeaderExchangeChannel 在调用 channel.send(Object message) 方法
+                // channel 属性为 HeaderExchanger.connect(URL url, ExchangeHandler handler) 中 Transporters.connect(url, new DecodeHandler(new HeaderExchangeHandler(handler))) 赋值的
                 ResponseFuture future = currentClient.request(inv, timeout);
                 // 调用 RpcContext#setFuture(future) 方法，在 FutureFitler 中，异步回调。
                 RpcContext.getContext().setFuture(new FutureAdapter<Object>(future));
