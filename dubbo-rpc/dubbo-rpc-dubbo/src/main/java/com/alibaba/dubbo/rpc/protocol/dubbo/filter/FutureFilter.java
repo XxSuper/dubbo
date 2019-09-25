@@ -99,7 +99,10 @@ public class FutureFilter implements Filter {
         Future<?> f = RpcContext.getContext().getFuture();
         if (f instanceof FutureAdapter) {
             ResponseFuture future = ((FutureAdapter<?>) f).getFuture();
-            // 触发回调
+            // 触发回调，future.setCallback(ResponseCallback callback) 会进行lock阻塞，等待 done，以后执行 callback.
+            // done 是在 netty handler 通知以后 在 NettyClientHandler 中 调用 channelRead(ChannelHandlerContext ctx, Object msg) 方法 赋值 reponse
+            // 调用顺序 NettyClientHandler.channelRead(ChannelHandlerContext ctx, Object msg) --> DecodeHandler.received(Channel channel, Object message)
+            // --> HeaderExchangeHandler.received(Channel channel, Object message) 在  handleResponse(channel, (Response) message) 中设置 Response
             future.setCallback(new ResponseCallback() {
 
                 /**
