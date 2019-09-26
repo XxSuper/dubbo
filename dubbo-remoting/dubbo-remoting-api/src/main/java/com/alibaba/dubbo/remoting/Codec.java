@@ -26,6 +26,8 @@ import java.io.OutputStream;
 
 /**
  * Codec. (SPI, Singleton, ThreadSafe)
+ * 老的编解码器接口，被 Codec2 取代。
+ * 通过 CodecAdapter ，将 Codec 适配成 Codec2 。
  */
 @Deprecated
 @SPI

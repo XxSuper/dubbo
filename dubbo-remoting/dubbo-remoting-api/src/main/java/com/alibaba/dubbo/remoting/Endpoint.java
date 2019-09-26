@@ -22,6 +22,7 @@ import java.net.InetSocketAddress;
 
 /**
  * Endpoint. (API/SPI, Prototype, ThreadSafe)
+ * 端点接口，在 dubbo-remoting-api 中，一个 Client 或 Server ，都是一个 Endpoint 。
  *
  *
  * @see com.alibaba.dubbo.remoting.Channel
@@ -30,6 +31,7 @@ import java.net.InetSocketAddress;
  */
 public interface Endpoint {
 
+    /*************************** 属性相关 *******************************/
     /**
      * get url.
      *
@@ -51,6 +53,8 @@ public interface Endpoint {
      */
     InetSocketAddress getLocalAddress();
 
+    /*************************** 发送消息 *******************************/
+
     /**
      * send message.
      *
@@ -66,6 +70,8 @@ public interface Endpoint {
      * @param sent    already sent to socket?
      */
     void send(Object message, boolean sent) throws RemotingException;
+
+    /*************************** 关闭相关 *******************************/
 
     /**
      * close the channel.

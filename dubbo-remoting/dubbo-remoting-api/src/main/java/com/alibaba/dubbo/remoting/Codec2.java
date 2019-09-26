@@ -23,16 +23,38 @@ import com.alibaba.dubbo.remoting.buffer.ChannelBuffer;
 
 import java.io.IOException;
 
+/**
+ * Codec2
+ * 编解码器接口。
+ */
+// Dubbo SPI 拓展点。
 @SPI
 public interface Codec2 {
 
+    /**
+     * 编码
+     *
+     * @param channel 通道
+     * @param buffer Buffer
+     * @param message 消息
+     * @throws IOException 当编码发生异常时
+     */
+    // @Adaptive({Constants.CODEC_KEY}) 注解，基于 Dubbo SPI Adaptive 机制，加载对应的 Codec2 实现，使用 URL.codec 属性。
     @Adaptive({Constants.CODEC_KEY})
     void encode(Channel channel, ChannelBuffer buffer, Object message) throws IOException;
 
+    /**
+     * 解码
+     *
+     * @param channel 通道
+     * @param buffer Buffer
+     * @return 消息
+     * @throws IOException 当解码发生异常时
+     */
     @Adaptive({Constants.CODEC_KEY})
     Object decode(Channel channel, ChannelBuffer buffer) throws IOException;
 
-
+    // 解码过程中，需要解决 TCP 拆包、粘包的场景，因此解码结果如下。
     enum DecodeResult {
         // 收到的字节流不是一个完整数据包，需要等待更多数据到达
         NEED_MORE_INPUT,

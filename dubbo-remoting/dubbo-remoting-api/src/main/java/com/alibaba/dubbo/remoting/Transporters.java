@@ -24,6 +24,7 @@ import com.alibaba.dubbo.remoting.transport.ChannelHandlerDispatcher;
 
 /**
  * Transporter facade. (API, Static, ThreadSafe)
+ * Transporter 门面类。
  */
 public class Transporters {
 
@@ -36,6 +37,7 @@ public class Transporters {
     private Transporters() {
     }
 
+    // 静态方法，绑定一个服务器。
     public static Server bind(String url, ChannelHandler... handler) throws RemotingException {
         return bind(URL.valueOf(url), handler);
     }
@@ -47,15 +49,19 @@ public class Transporters {
         if (handlers == null || handlers.length == 0) {
             throw new IllegalArgumentException("handlers == null");
         }
+        // 创建 handler
         ChannelHandler handler;
         if (handlers.length == 1) {
             handler = handlers[0];
         } else {
+            // 若 handlers 是多个，使用 ChannelHandlerDispatcher 进行封装。在 ChannelHandlerDispatcher 中，会循环调用 handlers ，对应的方法。
             handler = new ChannelHandlerDispatcher(handlers);
         }
+        // 创建 Server 对象，在 Transporter$Adaptive 对象中，会根据 url 参数，获得对应的 Transporter 实现对象（例如， NettyTransporter），从而创建对应的 Server 对象（例如， NettyServer）。
         return getTransporter().bind(url, handler);
     }
 
+    // 连接一个服务器，即创建一个客户端。
     public static Client connect(String url, ChannelHandler... handler) throws RemotingException {
         return connect(URL.valueOf(url), handler);
     }
@@ -70,12 +76,14 @@ public class Transporters {
         } else if (handlers.length == 1) {
             handler = handlers[0];
         } else {
+            // 若 handlers 是多个，使用 ChannelHandlerDispatcher 进行封装。在 ChannelHandlerDispatcher 中，会循环调用 handlers ，对应的方法。
             handler = new ChannelHandlerDispatcher(handlers);
         }
         return getTransporter().connect(url, handler);
     }
 
     public static Transporter getTransporter() {
+        // 基于 Dubbo SPI 机制，获得 Transporter$Adaptive 对象。
         return ExtensionLoader.getExtensionLoader(Transporter.class).getAdaptiveExtension();
     }
 

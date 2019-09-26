@@ -21,6 +21,8 @@ import com.alibaba.dubbo.common.extension.SPI;
 
 /**
  * ChannelHandler. (API, Prototype, ThreadSafe)
+ * 通道处理器接口。
+ * 和 Netty ChannelHandler 一致，负责 Channel 中的逻辑处理。在 dubbo-remoting-netty4 项目中，NettyServerHandler 是 Dubbo ChannelHandler 的实现，内部调用 Netty ChannelHandler 的方法，进行逻辑处理。
  *
  * @see com.alibaba.dubbo.remoting.Transporter#bind(com.alibaba.dubbo.common.URL, ChannelHandler)
  * @see com.alibaba.dubbo.remoting.Transporter#connect(com.alibaba.dubbo.common.URL, ChannelHandler)

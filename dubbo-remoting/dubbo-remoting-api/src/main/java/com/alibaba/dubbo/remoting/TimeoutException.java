@@ -20,6 +20,7 @@ import java.net.InetSocketAddress;
 
 /**
  * TimeoutException. (API, Prototype, ThreadSafe)
+ * 实现 RemotingException 类，超时异常。
  *
  * @export
  * @see com.alibaba.dubbo.remoting.exchange.ResponseFuture#get()
@@ -27,9 +28,20 @@ import java.net.InetSocketAddress;
  */
 public class TimeoutException extends RemotingException {
 
+    /**
+     * 客户端
+     */
     public static final int CLIENT_SIDE = 0;
+
+    /**
+     * 服务端
+     */
     public static final int SERVER_SIDE = 1;
     private static final long serialVersionUID = 3122966731958222692L;
+
+    /**
+     * 阶段
+     */
     private final int phase;
 
     public TimeoutException(boolean serverSide, Channel channel, String message) {
