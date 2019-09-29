@@ -22,6 +22,7 @@ import com.alibaba.dubbo.remoting.Dispatcher;
 
 /**
  * default thread pool configure
+ * 所有消息都派发到线程池，包括请求，响应，连接事件，断开事件，心跳等。
  */
 public class AllDispatcher implements Dispatcher {
 
@@ -29,6 +30,7 @@ public class AllDispatcher implements Dispatcher {
 
     @Override
     public ChannelHandler dispatch(ChannelHandler handler, URL url) {
+        // 创建 AllChannelHandler 对象，并传入 handler 属性。AllChannelHandler 也是 ChannelHandlerDelegate 类型。也就是说“线程模型”，也是通过装饰器模式，组合而成。
         return new AllChannelHandler(handler, url);
     }
 

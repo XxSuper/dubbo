@@ -30,11 +30,18 @@ import java.net.InetSocketAddress;
 
 /**
  * AbstractCodec
+ * 实现 Codec2 接口，提供公用方法
  */
 public abstract class AbstractCodec implements Codec2 {
 
     private static final Logger logger = LoggerFactory.getLogger(AbstractCodec.class);
 
+    /**
+     * 静态方法，校验消息长度。
+     * @param channel
+     * @param size
+     * @throws IOException
+     */
     protected static void checkPayload(Channel channel, long size) throws IOException {
         int payload = Constants.DEFAULT_PAYLOAD;
         if (channel != null && channel.getUrl() != null) {
@@ -47,10 +54,20 @@ public abstract class AbstractCodec implements Codec2 {
         }
     }
 
+    /**
+     * 获得 Serialization 对象。
+     * @param channel
+     * @return
+     */
     protected Serialization getSerialization(Channel channel) {
         return CodecSupport.getSerialization(channel.getUrl());
     }
 
+    /**
+     * 是否为客户端侧的通道。
+     * @param channel
+     * @return
+     */
     protected boolean isClientSide(Channel channel) {
         String side = (String) channel.getAttribute(Constants.SIDE_KEY);
         if ("client".equals(side)) {
@@ -58,6 +75,7 @@ public abstract class AbstractCodec implements Codec2 {
         } else if ("server".equals(side)) {
             return false;
         } else {
+            // 如果 remoteAddress 的 port 和 host 与 url 的 port 和 ip 一致则为客户端测
             InetSocketAddress address = channel.getRemoteAddress();
             URL url = channel.getUrl();
             boolean client = url.getPort() == address.getPort()
@@ -70,6 +88,11 @@ public abstract class AbstractCodec implements Codec2 {
         }
     }
 
+    /**
+     * 是否为服务端侧的通道。
+     * @param channel
+     * @return
+     */
     protected boolean isServerSide(Channel channel) {
         return !isClientSide(channel);
     }

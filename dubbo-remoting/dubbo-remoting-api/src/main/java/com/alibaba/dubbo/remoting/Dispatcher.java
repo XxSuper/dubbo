@@ -25,6 +25,7 @@ import com.alibaba.dubbo.remoting.transport.dispatcher.all.AllDispatcher;
 /**
  * ChannelHandlerWrapper (SPI, Singleton, ThreadSafe)
  * 调度器接口。
+ * 每个 Dispatcher 实现类，都对应一个 ChannelHandler 实现类。默认未配置的情况下，使用 AllDispatcher 调度
  */
 // Dubbo SPI 拓展点，默认为 "all" 。
 @SPI(AllDispatcher.NAME)

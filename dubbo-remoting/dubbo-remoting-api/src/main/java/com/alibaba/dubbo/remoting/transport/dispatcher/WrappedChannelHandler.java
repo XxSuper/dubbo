@@ -32,23 +32,43 @@ import com.alibaba.dubbo.remoting.transport.ChannelHandlerDelegate;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
+/**
+ * WrappedChannelHandler
+ * 实现 ChannelHandlerDelegate 接口。包装的 WrappedChannelHandler 实现类。
+ * 从目前的实现来看，WrappedChannelHandler 继承 AbstractChannelHandlerDelegate 更合适，因为 #connected(channel) 等，实现的方法都是相同的。
+ */
 public class WrappedChannelHandler implements ChannelHandlerDelegate {
 
     protected static final Logger logger = LoggerFactory.getLogger(WrappedChannelHandler.class);
 
+    /**
+     * 共享线程池
+     */
     protected static final ExecutorService SHARED_EXECUTOR = Executors.newCachedThreadPool(new NamedThreadFactory("DubboSharedHandler", true));
 
+    /**
+     * 线程池
+     */
     protected final ExecutorService executor;
 
+    /**
+     * 通道处理器
+     */
     protected final ChannelHandler handler;
 
+    /**
+     * URL
+     */
     protected final URL url;
 
     public WrappedChannelHandler(ChannelHandler handler, URL url) {
         this.handler = handler;
         this.url = url;
+
+        // 基于 Dubbo SPI Adaptive 机制，创建线程池。
         executor = (ExecutorService) ExtensionLoader.getExtensionLoader(ThreadPool.class).getAdaptiveExtension().getExecutor(url);
 
+        // 添加线程池到 DataStore 中
         String componentKey = Constants.EXECUTOR_SERVICE_COMPONENT_KEY;
         if (Constants.CONSUMER_SIDE.equalsIgnoreCase(url.getParameter(Constants.SIDE_KEY))) {
             componentKey = Constants.CONSUMER_SIDE;

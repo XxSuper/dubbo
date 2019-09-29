@@ -24,13 +24,26 @@ import com.alibaba.dubbo.remoting.Dispatcher;
 import com.alibaba.dubbo.remoting.exchange.support.header.HeartbeatHandler;
 import com.alibaba.dubbo.remoting.transport.MultiMessageHandler;
 
+/**
+ * ChannelHandlers
+ * 通道处理器工厂
+ */
 public class ChannelHandlers {
 
+    /**
+     * 单例
+     */
     private static ChannelHandlers INSTANCE = new ChannelHandlers();
 
     protected ChannelHandlers() {
     }
 
+    /**
+     * 包装通道处理器
+     * @param handler
+     * @param url
+     * @return
+     */
     public static ChannelHandler wrap(ChannelHandler handler, URL url) {
         return ChannelHandlers.getInstance().wrapInternal(handler, url);
     }
@@ -43,6 +56,12 @@ public class ChannelHandlers {
         INSTANCE = instance;
     }
 
+    /**
+     * 多个 ChannelHandlerDelegate 的组合。Dispatcher#dispatch(handler, url) 方法，实际上也是返回一个 ChannelHandlerDelegate 对象。
+     * @param handler
+     * @param url
+     * @return
+     */
     protected ChannelHandler wrapInternal(ChannelHandler handler, URL url) {
         return new MultiMessageHandler(new HeartbeatHandler(ExtensionLoader.getExtensionLoader(Dispatcher.class)
                 .getAdaptiveExtension().dispatch(handler, url)));
