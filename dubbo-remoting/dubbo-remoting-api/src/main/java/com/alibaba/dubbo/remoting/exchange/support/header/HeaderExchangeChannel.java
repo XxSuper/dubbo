@@ -35,6 +35,8 @@ import java.net.InetSocketAddress;
 
 /**
  * ExchangeReceiver
+ * 实现 ExchangeChannel 接口，基于消息头部( Header )的信息交换通道实现类。
+ * HeaderExchangeChannel 是传入 channel 属性的装饰器，每个实现的方法，都会调用 channel 。
  */
 final class HeaderExchangeChannel implements ExchangeChannel {
 
@@ -42,8 +44,14 @@ final class HeaderExchangeChannel implements ExchangeChannel {
 
     private static final String CHANNEL_KEY = HeaderExchangeChannel.class.getName() + ".CHANNEL";
 
+    /**
+     * 通道
+     */
     private final Channel channel;
 
+    /**
+     * 是否关闭
+     */
     private volatile boolean closed = false;
 
     HeaderExchangeChannel(Channel channel) {
@@ -53,22 +61,37 @@ final class HeaderExchangeChannel implements ExchangeChannel {
         this.channel = channel;
     }
 
+    /**
+     * 静态方法，创建 HeaderExchangeChannel 对象。
+     * @param ch
+     * @return
+     */
     static HeaderExchangeChannel getOrAddChannel(Channel ch) {
+        // 判空。传入的 ch 属性，实际就是 HeaderExchangeChanel.channel 属性。
         if (ch == null) {
             return null;
         }
+        // 通过 ch.attribute 的 CHANNEL_KEY 键值，保证有且仅有为 ch 属性，创建唯一的 HeaderExchangeChannel 对象。
         HeaderExchangeChannel ret = (HeaderExchangeChannel) ch.getAttribute(CHANNEL_KEY);
         if (ret == null) {
             ret = new HeaderExchangeChannel(ch);
+            // 要求已连接
             if (ch.isConnected()) {
+                // 设置进 channel 的 attribute 中
                 ch.setAttribute(CHANNEL_KEY, ret);
             }
         }
         return ret;
     }
 
+    /**
+     * 静态方法，移除 HeaderExchangeChannel 对象
+     * @param ch
+     */
     static void removeChannelIfDisconnected(Channel ch) {
+        // 未连接
         if (ch != null && !ch.isConnected()) {
+            // 移除
             ch.removeAttribute(CHANNEL_KEY);
         }
     }
@@ -103,21 +126,29 @@ final class HeaderExchangeChannel implements ExchangeChannel {
 
     @Override
     public ResponseFuture request(Object request, int timeout) throws RemotingException {
+        // 若已经关闭，不再允许发起新的请求。
         if (closed) {
             throw new RemotingException(this.getLocalAddress(), null, "Failed to send request " + request + ", cause: The channel " + this + " is closed!");
         }
-        // create request.
+        // create request. 创建请求
         Request req = new Request();
+        // 设置 DUBBO 版本
         req.setVersion(Version.getProtocolVersion());
+        // 需要响应
         req.setTwoWay(true);
+        // 设置发送的消息
         req.setData(request);
+        // 创建 DefaultFuture 对象
         DefaultFuture future = new DefaultFuture(channel, req, timeout);
         try {
+            // 发送请求
             channel.send(req);
         } catch (RemotingException e) {
+            // 发生异常，取消 DefaultFuture
             future.cancel();
             throw e;
         }
+        // 返回 DefaultFuture 对象
         return future;
     }
 
@@ -141,9 +172,12 @@ final class HeaderExchangeChannel implements ExchangeChannel {
         if (closed) {
             return;
         }
+        // 标记 closed = true ，避免发起新的请求。
         closed = true;
+        // 等待请求完成
         if (timeout > 0) {
             long start = System.currentTimeMillis();
+            // 判断已发起的已经是否已经都响应了。若否，等待完成或超时。
             while (DefaultFuture.hasFuture(channel)
                     && System.currentTimeMillis() - start < timeout) {
                 try {
@@ -153,6 +187,7 @@ final class HeaderExchangeChannel implements ExchangeChannel {
                 }
             }
         }
+        // 关闭通道
         close();
     }
 
