@@ -21,26 +21,58 @@ import com.alibaba.dubbo.common.utils.StringUtils;
 import java.util.concurrent.atomic.AtomicLong;
 
 /**
- * Request.
+ * Request. 请求
  */
 public class Request {
 
+    /**
+     * 事件 - 心跳
+     */
     public static final String HEARTBEAT_EVENT = null;
 
+    /**
+     * 事件 - 只读
+     */
     public static final String READONLY_EVENT = "R";
 
+    /**
+     * 请求编号自增序列
+     */
     private static final AtomicLong INVOKE_ID = new AtomicLong(0);
 
+    /**
+     * 请求编号，使用 INVOKE_ID 属性生成，JVM 进程内唯一。
+     */
     private final long mId;
 
+    /**
+     * Dubbo 版本
+     */
     private String mVersion;
 
+    /**
+     * 标记请求是否需要响应
+     *
+     * true-需要
+     * false-不需要
+     */
     private boolean mTwoWay = true;
 
+    /**
+     * 是否是事件。例如，心跳事件。
+     */
     private boolean mEvent = false;
 
+    /**
+     * 是否异常的请求。
+     *
+     * 在消息解析的时候，会出现。
+     */
     private boolean mBroken = false;
 
+    /**
+     * 数据
+     */
     private Object mData;
 
     public Request() {

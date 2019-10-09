@@ -20,6 +20,7 @@ import com.alibaba.dubbo.remoting.RemotingException;
 
 /**
  * Future. (API/SPI, Prototype, ThreadSafe)
+ * 响应 Future 接口。
  *
  * @see com.alibaba.dubbo.remoting.exchange.ExchangeChannel#request(Object)
  * @see com.alibaba.dubbo.remoting.exchange.ExchangeChannel#request(Object, int)
@@ -27,14 +28,14 @@ import com.alibaba.dubbo.remoting.RemotingException;
 public interface ResponseFuture {
 
     /**
-     * get result.
+     * get result. 获得结果
      *
      * @return result.
      */
     Object get() throws RemotingException;
 
     /**
-     * get result with the specified timeout.
+     * get result with the specified timeout. 获得结果
      *
      * @param timeoutInMillis timeout.
      * @return result.
@@ -42,14 +43,14 @@ public interface ResponseFuture {
     Object get(int timeoutInMillis) throws RemotingException;
 
     /**
-     * set callback.
+     * set callback. 设置回调
      *
      * @param callback
      */
     void setCallback(ResponseCallback callback);
 
     /**
-     * check is done.
+     * check is done. 是否完成
      *
      * @return done or not.
      */

@@ -26,14 +26,24 @@ import com.alibaba.dubbo.remoting.exchange.Request;
 
 import java.util.Collection;
 
+/**
+ * 实现 Runnable 接口，心跳任务。
+ */
 final class HeartBeatTask implements Runnable {
 
     private static final Logger logger = LoggerFactory.getLogger(HeartBeatTask.class);
 
+    // 用于查询获得需要心跳的通道数组。
     private ChannelProvider channelProvider;
 
+    /**
+     * 心跳间隔，单位：毫秒
+     */
     private int heartbeat;
 
+    /**
+     * 心跳超时时间，单位：毫秒
+     */
     private int heartbeatTimeout;
 
     HeartBeatTask(ChannelProvider provider, int heartbeat, int heartbeatTimeout) {
@@ -45,38 +55,49 @@ final class HeartBeatTask implements Runnable {
     @Override
     public void run() {
         try {
+            // 开始时间
             long now = System.currentTimeMillis();
+            // 获得需要心跳的通道数组，遍历
             for (Channel channel : channelProvider.getChannels()) {
+                // 通道关闭，遍历
                 if (channel.isClosed()) {
                     continue;
                 }
                 try {
+                    // 最后读的时间
                     Long lastRead = (Long) channel.getAttribute(
                             HeaderExchangeHandler.KEY_READ_TIMESTAMP);
+                    // 最后写的时间
                     Long lastWrite = (Long) channel.getAttribute(
                             HeaderExchangeHandler.KEY_WRITE_TIMESTAMP);
                     if ((lastRead != null && now - lastRead > heartbeat)
                             || (lastWrite != null && now - lastWrite > heartbeat)) {
                         Request req = new Request();
                         req.setVersion(Version.getProtocolVersion());
+                        // 需要响应
                         req.setTwoWay(true);
+                        // 设置心跳事件
                         req.setEvent(Request.HEARTBEAT_EVENT);
+                        // 发送消息
                         channel.send(req);
                         if (logger.isDebugEnabled()) {
                             logger.debug("Send heartbeat to remote channel " + channel.getRemoteAddress()
                                     + ", cause: The channel has no data-transmission exceeds a heartbeat period: " + heartbeat + "ms");
                         }
                     }
+                    // 最后读的时间，超过心跳超时时间
                     if (lastRead != null && now - lastRead > heartbeatTimeout) {
                         logger.warn("Close channel " + channel
                                 + ", because heartbeat read idle time out: " + heartbeatTimeout + "ms");
                         if (channel instanceof Client) {
                             try {
+                                // 客户端侧，重新连接服务端
                                 ((Client) channel).reconnect();
                             } catch (Exception e) {
                                 //do nothing
                             }
                         } else {
+                            // 服务端侧，关闭客户端连接。
                             channel.close();
                         }
                     }
@@ -90,6 +111,7 @@ final class HeartBeatTask implements Runnable {
     }
 
     interface ChannelProvider {
+        // 获取通道数组
         Collection<Channel> getChannels();
     }
 

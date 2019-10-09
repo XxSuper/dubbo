@@ -17,19 +17,19 @@
 package com.alibaba.dubbo.remoting.exchange;
 
 /**
- * Callback
+ * Callback 响应回调接口
  */
 public interface ResponseCallback {
 
     /**
-     * done.
+     * done. 处理执行完成
      *
      * @param response
      */
     void done(Object response);
 
     /**
-     * caught exception.
+     * caught exception. 处理发生异常
      *
      * @param exception
      */

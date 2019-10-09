@@ -43,17 +43,28 @@ import java.io.InputStream;
 
 /**
  * ExchangeCodec.
+ * 继承 TelnetCodec 类，信息交换编解码器。
  *
- *
+ * 基于消息长度的方式，做每条消息的粘包拆包处理。
+ * Header 部分，协议头，通过 Codec 编解码。
+ *  [0, 15]：Magic Number
+ *  [16, 20]：Serialization 编号。
+ *  [21]：event 是否为事件。
+ *  [22]：twoWay 是否需要响应。
+ *  [23]：是请求还是响应。
+ *  [24 - 31]：status 状态。
+ *  [32 - 95]：id 编号，Long 型。
+ *  [96 - 127]：Body 的长度。通过该长度，读取 Body 。
+ * Body 部分，协议体，通过 Serialization 序列化/反序列化。
  *
  */
 public class ExchangeCodec extends TelnetCodec {
 
-    // header length. 协议头部长度，共16个字节。
+    // header length. 协议头部长度，共16个字节，128 Bits。
     protected static final int HEADER_LENGTH = 16;
 
     // magic header. 魔数，固定为0xdabb，2个字节，用来判断是否是一个dubbo协议包
-    protected static final short MAGIC = (short) 0xdabb;
+    protected static final short MAGIC = (short) 0xdabb; // 十进制 55995 二进制 1101101010111011
     // 魔数的高8位。
     protected static final byte MAGIC_HIGH = Bytes.short2bytes(MAGIC)[0];
     // 魔数的低8位。
@@ -77,10 +88,13 @@ public class ExchangeCodec extends TelnetCodec {
 
     @Override
     public void encode(Channel channel, ChannelBuffer buffer, Object msg) throws IOException {
+        // 请求
         if (msg instanceof Request) {
             encodeRequest(channel, buffer, (Request) msg);
+        // 响应
         } else if (msg instanceof Response) {
             encodeResponse(channel, buffer, (Response) msg);
+        // 提交给父类( Telnet ) 处理，目前是 Telnet 命令的结果。
         } else {
             super.encode(channel, buffer, msg);
         }
@@ -231,16 +245,20 @@ public class ExchangeCodec extends TelnetCodec {
         Serialization serialization = getSerialization(channel);
         // header. 协议头总长度为16字节
         byte[] header = new byte[HEADER_LENGTH];
-        // set magic number. 设置魔数
+        // set magic number. `[0 - 15]` 设置魔数
         Bytes.short2bytes(MAGIC, header);
 
+        // `[16, 17, 18]`： 请求响应标识、单双向标识、事件标识 && `[19-23]`：Serialization 编号。
         // set request and serialization flag. 设置消息标记位，总长度为1个字节，前3位分别表示请求响应标识、单双向标识和事件标识，后5位标识序列化id
         header[2] = (byte) (FLAG_REQUEST | serialization.getContentTypeId());
 
+        // `[17]`：`twoWay` 是否需要响应。
         if (req.isTwoWay()) header[2] |= FLAG_TWOWAY;
+
+        // `[18]`：`event` 是否为事件。
         if (req.isEvent()) header[2] |= FLAG_EVENT;
 
-        // set request id. 设置请求id
+        // set request id. `[32 - 95]`：设置请求 id 编号，Long 型（64 位）。
         Bytes.long2bytes(req.getId(), header, 4);
 
         // encode request data.

@@ -28,6 +28,8 @@ import java.util.Collection;
 
 /**
  * ExchangeServerDelegate
+ * 实现 ExchangeServer 接口，信息交换服务器装饰者。在每个实现的方法里，直接调用被装饰的 server 属性的方法。
+ * dubbo-remoting-p2p 模块中，ExchangeServerPeer 会继承该类
  */
 public class ExchangeServerDelegate implements ExchangeServer {
 

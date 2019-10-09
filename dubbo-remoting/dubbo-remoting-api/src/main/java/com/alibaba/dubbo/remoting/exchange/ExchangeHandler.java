@@ -22,12 +22,13 @@ import com.alibaba.dubbo.remoting.telnet.TelnetHandler;
 
 /**
  * ExchangeHandler. (API, Prototype, ThreadSafe)
- * 这个处理器，负责将请求，转发到对应的 Invoker 对象，执行逻辑，返回结果。
+ * 继承 ChannelHandler 和 TelnetHandler 接口，信息交换处理器接口，这个处理器，负责将请求，转发到对应的 Invoker 对象，执行逻辑，返回结果。
  */
 public interface ExchangeHandler extends ChannelHandler, TelnetHandler {
 
     /**
-     * reply.
+     * reply. 回复请求结果
+     * 注意，返回的是请求结果。将请求结果，设置到 Response.mResult 属性中。
      *
      * @param channel
      * @param request
