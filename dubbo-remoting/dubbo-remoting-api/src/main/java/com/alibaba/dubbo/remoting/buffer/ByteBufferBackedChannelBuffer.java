@@ -22,33 +22,53 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.nio.ByteBuffer;
 
+/**
+ * 实现 AbstractChannelBuffer 抽象类，基于 java.nio.ByteBuffer 的 Buffer 实现类。
+ */
 public class ByteBufferBackedChannelBuffer extends AbstractChannelBuffer {
 
+    /**
+     * buffer
+     * java.nio.ByteBuffer
+     */
     private final ByteBuffer buffer;
 
+    /**
+     * 容量
+     */
     private final int capacity;
 
     public ByteBufferBackedChannelBuffer(ByteBuffer buffer) {
         if (buffer == null) {
             throw new NullPointerException("buffer");
         }
-
+        // buffer
+        // buffer.slice() 分割缓冲区与复制相似，但 slice() 创建一个从原始缓冲区的当前 position 开始的新缓冲区，并且其容量是原始缓冲区的剩余元素数量（limit - position）。
+        // 这个新缓冲区与原始缓冲区共享一段数据这个新缓冲区与原始缓冲区共享一段数据元素子序列。分割出来的缓冲区也会继承只读和直接属性。
         this.buffer = buffer.slice();
+        // 容量
         capacity = buffer.remaining();
+        // 设置 `writerIndex`
         writerIndex(capacity);
     }
 
     public ByteBufferBackedChannelBuffer(ByteBufferBackedChannelBuffer buffer) {
+        // buffer
         this.buffer = buffer.buffer;
+        // 容量
         capacity = buffer.capacity;
+        // 设置 `writerIndex` `readerIndex`
         setIndex(buffer.readerIndex(), buffer.writerIndex());
     }
 
     @Override
     public ChannelBufferFactory factory() {
+        // 缓冲区是否为直接缓冲区。
         if (buffer.isDirect()) {
+            // 直接缓冲区工厂
             return DirectChannelBufferFactory.getInstance();
         } else {
+            // 非缓冲区工厂（堆）
             return HeapChannelBufferFactory.getInstance();
         }
     }
@@ -166,8 +186,11 @@ public class ByteBufferBackedChannelBuffer extends AbstractChannelBuffer {
 
     @Override
     public void setBytes(int index, ByteBuffer src) {
+        // duplicate() 函数创建了一个与原始缓冲区相似的新缓冲区。两个缓冲区共享数据元素，拥有同样的容量，但每个缓冲区拥有各自的 position、limit 和 mark 属性。
+        // 对一个缓冲区里的数据元素所做的改变会反映在另外一个缓冲区上。这一副本缓冲区具有与原始缓冲区同样的数据视图。如果原始的缓冲区为只读，或者为直接缓冲区，新的缓冲区将继承这些属性。
         ByteBuffer data = buffer.duplicate();
         data.limit(index + src.remaining()).position(index);
+        // 写入数据
         data.put(src);
     }
 

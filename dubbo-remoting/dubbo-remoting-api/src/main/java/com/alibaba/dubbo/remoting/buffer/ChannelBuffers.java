@@ -19,6 +19,10 @@ package com.alibaba.dubbo.remoting.buffer;
 
 import java.nio.ByteBuffer;
 
+/**
+ * ChannelBuffers
+ * Buffer 工具类，提供创建、比较 ChannelBuffer 等公用方法。
+ */
 public final class ChannelBuffers {
 
     public static final ChannelBuffer EMPTY_BUFFER = new HeapChannelBuffer(0);
@@ -30,15 +34,26 @@ public final class ChannelBuffers {
         return dynamicBuffer(256);
     }
 
+    /**
+     * HeapChannelBuffer
+     * @param capacity
+     * @return DynamicChannelBuffer
+     */
     public static ChannelBuffer dynamicBuffer(int capacity) {
         return new DynamicChannelBuffer(capacity);
     }
 
+    // DynamicChannelBuffer
     public static ChannelBuffer dynamicBuffer(int capacity,
                                               ChannelBufferFactory factory) {
         return new DynamicChannelBuffer(capacity, factory);
     }
 
+    /**
+     * HeapChannelBuffer
+     * @param capacity
+     * @return
+     */
     public static ChannelBuffer buffer(int capacity) {
         if (capacity < 0) {
             throw new IllegalArgumentException("capacity can not be negative");
@@ -49,6 +64,13 @@ public final class ChannelBuffers {
         return new HeapChannelBuffer(capacity);
     }
 
+    /**
+     * HeapChannelBuffer
+     * @param array
+     * @param offset
+     * @param length
+     * @return
+     */
     public static ChannelBuffer wrappedBuffer(byte[] array, int offset, int length) {
         if (array == null) {
             throw new NullPointerException("array == null");
@@ -58,6 +80,11 @@ public final class ChannelBuffers {
         return wrappedBuffer(dest);
     }
 
+    /**
+     * HeapChannelBuffer
+     * @param array
+     * @return
+     */
     public static ChannelBuffer wrappedBuffer(byte[] array) {
         if (array == null) {
             throw new NullPointerException("array == null");
@@ -68,6 +95,11 @@ public final class ChannelBuffers {
         return new HeapChannelBuffer(array);
     }
 
+    /**
+     * ByteBufferBackedChannelBuffer（nio ByteBuffer）
+     * @param buffer
+     * @return
+     */
     public static ChannelBuffer wrappedBuffer(ByteBuffer buffer) {
         if (!buffer.hasRemaining()) {
             return EMPTY_BUFFER;
@@ -79,6 +111,11 @@ public final class ChannelBuffers {
         }
     }
 
+    /**
+     * ByteBufferBackedChannelBuffer（nio ByteBuffer）
+     * @param capacity
+     * @return
+     */
     public static ChannelBuffer directBuffer(int capacity) {
         if (capacity == 0) {
             return EMPTY_BUFFER;

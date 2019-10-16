@@ -198,6 +198,7 @@ import java.nio.ByteBuffer;
  * <p/>
  * Please refer to {@link ChannelBufferInputStream} and {@link
  * ChannelBufferOutputStream}.
+ * 实现 Comparable 接口，通道 Buffer 接口。
  *
  *
  */
@@ -278,6 +279,7 @@ public interface ChannelBuffer extends Comparable<ChannelBuffer> {
     public boolean equals(Object o);
 
     /**
+     * 用于逻辑中，需要创建 ChannelBuffer 的情况
      * Returns the factory which creates a {@link ChannelBuffer} whose type and
      * default {@link java.nio.ByteOrder} are same with this buffer.
      */

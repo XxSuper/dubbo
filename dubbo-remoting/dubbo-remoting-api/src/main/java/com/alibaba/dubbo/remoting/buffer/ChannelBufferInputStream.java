@@ -20,10 +20,22 @@ package com.alibaba.dubbo.remoting.buffer;
 import java.io.IOException;
 import java.io.InputStream;
 
+/**
+ * ChannelBufferInputStream
+ * 实现 InputStream 接口
+ */
 public class ChannelBufferInputStream extends InputStream {
 
     private final ChannelBuffer buffer;
+
+    /**
+     * 开始位置
+     */
     private final int startIndex;
+
+    /**
+     * 结束位置
+     */
     private final int endIndex;
 
     public ChannelBufferInputStream(ChannelBuffer buffer) {
@@ -71,6 +83,8 @@ public class ChannelBufferInputStream extends InputStream {
         if (!buffer.readable()) {
             return -1;
         }
+        // byte 类型的数字要 & 0xff 再赋值给 int 类型，其本质原因就是想保持二进制补码的一致性。
+        //当 byte 要转化为 int 的时候，高的24位必然会补1，这样，其二进制补码其实已经不一致了，& 0xff 可以将高的24位置为0，低8位保持原样。这样做的目的就是为了保证二进制数据的一致性。
         return buffer.readByte() & 0xff;
     }
 
