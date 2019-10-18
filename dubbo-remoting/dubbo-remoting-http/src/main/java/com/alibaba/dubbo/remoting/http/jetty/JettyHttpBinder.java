@@ -23,6 +23,7 @@ import com.alibaba.dubbo.remoting.http.HttpServer;
 
 /**
  * JettyHttpTransporter
+ * 继承 com.alibaba.dubbo.remoting.http.HttpBinder，基于 Jetty 的 HttpBinder
  */
 public class JettyHttpBinder implements HttpBinder {
 

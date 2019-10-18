@@ -31,56 +31,82 @@ import org.apache.catalina.startup.Tomcat;
 
 import java.io.File;
 
+/**
+ * TomcatHttpServer
+ * 实现 AbstractHttpServer 抽象类，基于 Tomcat 的 HTTP 服务器实现类。
+ */
 public class TomcatHttpServer extends AbstractHttpServer {
 
     private static final Logger logger = LoggerFactory.getLogger(TomcatHttpServer.class);
 
+    /**
+     * 内嵌的 Tomcat 对象
+     */
     private final Tomcat tomcat;
 
+    /**
+     * URL 对象
+     */
     private final URL url;
 
     public TomcatHttpServer(URL url, final HttpHandler handler) {
         super(url, handler);
 
         this.url = url;
+
+        // 注册 HttpHandler 到 DispatcherServlet 中
         DispatcherServlet.addHttpHandler(url.getPort(), handler);
+
+        // 创建内嵌的 Tomcat 对象
         String baseDir = new File(System.getProperty("java.io.tmpdir")).getAbsolutePath();
         tomcat = new Tomcat();
         tomcat.setBaseDir(baseDir);
         tomcat.setPort(url.getPort());
+        // 最大线程数
         tomcat.getConnector().setProperty(
                 "maxThreads", String.valueOf(url.getParameter(Constants.THREADS_KEY, Constants.DEFAULT_THREADS)));
 //        tomcat.getConnector().setProperty(
 //                "minSpareThreads", String.valueOf(url.getParameter(Constants.THREADS_KEY, Constants.DEFAULT_THREADS)));
 
+        // 最大连接池
         tomcat.getConnector().setProperty(
                 "maxConnections", String.valueOf(url.getParameter(Constants.ACCEPTS_KEY, -1)));
-
+        // 编码为 UTF-8
         tomcat.getConnector().setProperty("URIEncoding", "UTF-8");
+        // 连接超时，60 秒
         tomcat.getConnector().setProperty("connectionTimeout", "60000");
 
         tomcat.getConnector().setProperty("maxKeepAliveRequests", "-1");
         tomcat.getConnector().setProtocol("org.apache.coyote.http11.Http11NioProtocol");
 
+        // 添加 DispatcherServlet 到 Tomcat 中
         Context context = tomcat.addContext("/", baseDir);
         Tomcat.addServlet(context, "dispatcher", new DispatcherServlet());
         context.addServletMapping("/*", "dispatcher");
+        // 添加 ServletContext 对象，到 ServletManager 中
         ServletManager.getInstance().addServletContext(url.getPort(), context.getServletContext());
 
         try {
+            // 启动 Tomcat
             tomcat.start();
         } catch (LifecycleException e) {
             throw new IllegalStateException("Failed to start tomcat server at " + url.getAddress(), e);
         }
     }
 
+    /**
+     * 关闭 Tomcat
+     * 缺少，调用 DispacherServlet#remove(port) 方法，将 HttpHandler 对象，移除出 DispatcherServlet。
+     */
     @Override
     public void close() {
+        // 标记关闭
         super.close();
-
+        // 从 ServletManager 移除 ServletContext 对象
         ServletManager.getInstance().removeServletContext(url.getPort());
 
         try {
+            // 关闭 Tomcat
             tomcat.stop();
         } catch (Exception e) {
             logger.warn(e.getMessage(), e);

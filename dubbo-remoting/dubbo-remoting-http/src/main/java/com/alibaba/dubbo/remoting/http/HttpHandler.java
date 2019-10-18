@@ -23,16 +23,17 @@ import java.io.IOException;
 
 /**
  * http invocation handler.
+ * HTTP 处理器接口
  */
 public interface HttpHandler {
 
     /**
-     * invoke.
+     * invoke. 处理器请求
      *
-     * @param request  request.
-     * @param response response.
-     * @throws IOException
-     * @throws ServletException
+     * @param request  request. 请求
+     * @param response response. 响应
+     * @throws IOException 发生 IO 异常
+     * @throws ServletException 发生 Servlet 异常
      */
     void handle(HttpServletRequest request, HttpServletResponse response) throws IOException, ServletException;
 

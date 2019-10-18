@@ -23,7 +23,9 @@ import com.alibaba.dubbo.common.extension.SPI;
 
 /**
  * HttpBinder
+ * HTTP 绑定器接口，负责创建对应的 HttpServer 对象。
  */
+// @SPI("jetty") 注解，Dubbo SPI 拓展点，默认为 "jetty" ，即未配置情况下，使用 Jetty Server。
 @SPI("jetty")
 public interface HttpBinder {
 
@@ -33,6 +35,7 @@ public interface HttpBinder {
      * @param url server url.
      * @return server.
      */
+    // @Adaptive({Constants.SERVER_KEY}) 注解，基于 Dubbo SPI Adaptive 机制，加载对应的 Server 实现，使用 URL.server 属性。
     @Adaptive({Constants.SERVER_KEY})
     HttpServer bind(URL url, HttpHandler handler);
 
