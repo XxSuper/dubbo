@@ -27,6 +27,11 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.nio.ByteBuffer;
 
+/**
+ * NettyBackedChannelBuffer
+ * 实现 ChannelBuffer 接口，基于 Netty ByteBuf 的 ChannelBuffer 实现类。
+ * 每个方法，直接调用 ByteBuf 对应的方法。
+ */
 public class NettyBackedChannelBuffer implements ChannelBuffer {
 
     private ByteBuf buffer;
@@ -48,6 +53,10 @@ public class NettyBackedChannelBuffer implements ChannelBuffer {
         return new NettyBackedChannelBuffer(buffer.copy(index, length));
     }
 
+    /**
+     * 无使用工厂的地方。另外，ByteBuf 默认情况下，容量为 Integer.MAX_VALUE
+     * @return
+     */
     //has nothing use
     @Override
     public ChannelBufferFactory factory() {
