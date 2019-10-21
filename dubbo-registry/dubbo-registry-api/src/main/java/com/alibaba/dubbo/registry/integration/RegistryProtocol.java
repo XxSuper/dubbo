@@ -82,7 +82,7 @@ public class RegistryProtocol implements Protocol {
     private final Map<String, ExporterChangeableWrapper<?>> bounds = new ConcurrentHashMap<String, ExporterChangeableWrapper<?>>();
 
     /**
-     * Cluster 自适应拓展实现类对象
+     * Cluster 自适应拓展实现类对象，Cluster$Adaptive 对象
      */
     private Cluster cluster;
 
@@ -380,7 +380,7 @@ public class RegistryProtocol implements Protocol {
      * @return Invoker 对象
      */
     private <T> Invoker<T> doRefer(Cluster cluster, Registry registry, Class<T> type, URL url) {
-        // 创建 RegistryDirectory 对象，并设置注册中心、协议 TODO
+        // 创建 RegistryDirectory 对象，并设置注册中心、协议。通过它，可以注册到一个注册中心的所有服务提供者
         RegistryDirectory<T> directory = new RegistryDirectory<T>(type, url);
         directory.setRegistry(registry);
         directory.setProtocol(protocol);
@@ -405,7 +405,7 @@ public class RegistryProtocol implements Protocol {
                         + "," + Constants.CONFIGURATORS_CATEGORY
                         + "," + Constants.ROUTERS_CATEGORY));
 
-        // 创建 Invoker 对象 TODO
+        // 创建 Invoker 对象。因为 cluster 是 Dubbo SPI Adaptive 类，所以可以自动获取到对应的 Cluster 实现类。
         Invoker invoker = cluster.join(directory);
         // 向本地注册表，注册消费者 TODO
         ProviderConsumerRegTable.registerConsumer(invoker, url, subscribeUrl, directory);
