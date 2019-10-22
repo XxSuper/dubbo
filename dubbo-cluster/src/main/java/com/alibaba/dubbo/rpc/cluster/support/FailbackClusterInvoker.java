@@ -44,21 +44,34 @@ import java.util.concurrent.TimeUnit;
  *
  * <a href="http://en.wikipedia.org/wiki/Failback">Failback</a>
  *
+ * 实现 AbstractClusterInvoker 抽象类，FailbackCluster Invoker 实现类。2
+ *
  */
 public class FailbackClusterInvoker<T> extends AbstractClusterInvoker<T> {
 
     private static final Logger logger = LoggerFactory.getLogger(FailbackClusterInvoker.class);
 
+    /**
+     * 重试频率
+     */
     private static final long RETRY_FAILED_PERIOD = 5 * 1000;
 
     /**
      * Use {@link NamedInternalThreadFactory} to produce {@link com.alibaba.dubbo.common.threadlocal.InternalThread}
      * which with the use of {@link com.alibaba.dubbo.common.threadlocal.InternalThreadLocal} in {@link RpcContext}.
+     * ScheduledExecutorService 对象
      */
     private final ScheduledExecutorService scheduledExecutorService = Executors.newScheduledThreadPool(2,
             new NamedInternalThreadFactory("failback-cluster-timer", true));
 
+    /**
+     * 失败任务集合
+     */
     private final ConcurrentMap<Invocation, AbstractClusterInvoker<?>> failed = new ConcurrentHashMap<Invocation, AbstractClusterInvoker<?>>();
+
+    /**
+     * 重试任务 Future
+     */
     private volatile ScheduledFuture<?> retryFuture;
 
     public FailbackClusterInvoker(Directory<T> directory) {
@@ -66,9 +79,11 @@ public class FailbackClusterInvoker<T> extends AbstractClusterInvoker<T> {
     }
 
     private void addFailed(Invocation invocation, AbstractClusterInvoker<?> router) {
+        // 若定时任务未初始化，进行创建
         if (retryFuture == null) {
             synchronized (this) {
                 if (retryFuture == null) {
+                    // 创建的定时任务，会调用 #retryFailed() 方法，重试任务，发起 RCP 调用。
                     retryFuture = scheduledExecutorService.scheduleWithFixedDelay(new Runnable() {
 
                         @Override
@@ -84,6 +99,7 @@ public class FailbackClusterInvoker<T> extends AbstractClusterInvoker<T> {
                 }
             }
         }
+        // 添加到失败任务
         failed.put(invocation, router);
     }
 
@@ -91,12 +107,15 @@ public class FailbackClusterInvoker<T> extends AbstractClusterInvoker<T> {
         if (failed.size() == 0) {
             return;
         }
+        // 循环重试任务，逐个发起 RPC 调用。若调用成功，移除该失败任务出 failed 集合。
         for (Map.Entry<Invocation, AbstractClusterInvoker<?>> entry : new HashMap<Invocation, AbstractClusterInvoker<?>>(
                 failed).entrySet()) {
             Invocation invocation = entry.getKey();
             Invoker<?> invoker = entry.getValue();
             try {
+                // RPC 调用得到 Result
                 invoker.invoke(invocation);
+                // 移除失败任务
                 failed.remove(invocation);
             } catch (Throwable e) {
                 logger.error("Failed retry to invoke method " + invocation.getMethodName() + ", waiting again.", e);
@@ -107,12 +126,17 @@ public class FailbackClusterInvoker<T> extends AbstractClusterInvoker<T> {
     @Override
     protected Result doInvoke(Invocation invocation, List<Invoker<T>> invokers, LoadBalance loadbalance) throws RpcException {
         try {
+            // 检查 invokers 即可用 Invoker 集合是否为空，如果为空，那么抛出异常
             checkInvokers(invokers, invocation);
+            // 根据负载均衡机制从 invokers 中选择一个 Invoker
             Invoker<T> invoker = select(loadbalance, invocation, invokers, null);
+            // RPC 调用得到 Result
             return invoker.invoke(invocation);
         } catch (Throwable e) {
             logger.error("Failback to invoke method " + invocation.getMethodName() + ", wait for retry in background. Ignored exception: "
                     + e.getMessage() + ", ", e);
+            // 若 RPC 调用失败，则调用 #addFailed(invocation, this) 方法，添加到 failed 中，后台定时重试。
+            // 添加到失败任务
             addFailed(invocation, this);
             return new RpcResult(); // ignore
         }

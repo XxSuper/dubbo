@@ -23,6 +23,7 @@ import com.alibaba.dubbo.rpc.cluster.Directory;
 
 /**
  * {@link FailbackClusterInvoker}
+ * 实现 Cluster 接口，失败自动恢复，后台记录失败请求，定时重发。通常用于消息通知操作。
  *
  */
 public class FailbackCluster implements Cluster {
@@ -31,6 +32,7 @@ public class FailbackCluster implements Cluster {
 
     @Override
     public <T> Invoker<T> join(Directory<T> directory) throws RpcException {
+        // 对应 Invoker 实现类为 FailbackClusterInvoker
         return new FailbackClusterInvoker<T>(directory);
     }
 

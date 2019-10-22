@@ -28,7 +28,7 @@ import java.util.List;
 
 /**
  * AvailableCluster
- *
+ * 实现 Cluster 接口，调用首个可用服务器，目前用于多注册中心引用。
  */
 public class AvailableCluster implements Cluster {
 
@@ -36,11 +36,12 @@ public class AvailableCluster implements Cluster {
 
     @Override
     public <T> Invoker<T> join(Directory<T> directory) throws RpcException {
-
+        // 对应 Invoker 实现类为 AvailableClusterInvoker。
         return new AbstractClusterInvoker<T>(directory) {
             @Override
             public Result doInvoke(Invocation invocation, List<Invoker<T>> invokers, LoadBalance loadbalance) throws RpcException {
                 for (Invoker<T> invoker : invokers) {
+                    // 调用首个可用服务器
                     if (invoker.isAvailable()) {
                         return invoker.invoke(invocation);
                     }
