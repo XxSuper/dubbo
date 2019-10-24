@@ -55,32 +55,101 @@ import java.util.Set;
 
 /**
  * RegistryDirectory
- *
+ * 基于注册中心的动态 Directory 实现类，从命名上看出它是动态的，会根据注册中心的推送变更 List<Invoker>。
+ * 实现 NotifyListener 接口，实现 AbstractDirectory 抽象类，基于注册中心的 Directory 实现类。
+ * 1、RegistryDirectory 在 dubbo-registry 模块，integration 包下，是 Dubbo 注册中心模块集成 Directory 的实现类。
+ * 2、RegistryDirectory 作为一个 NotifyListener ，订阅注册中心( Registry ) 的数据，实现对变更的监听。
  */
 public class RegistryDirectory<T> extends AbstractDirectory<T> implements NotifyListener {
 
     private static final Logger logger = LoggerFactory.getLogger(RegistryDirectory.class);
 
+    /**
+     * Cluster$Adaptive 对象
+     */
     private static final Cluster cluster = ExtensionLoader.getExtensionLoader(Cluster.class).getAdaptiveExtension();
 
+    /**
+     * RouterFactory$Adaptive 对象
+     */
     private static final RouterFactory routerFactory = ExtensionLoader.getExtensionLoader(RouterFactory.class).getAdaptiveExtension();
 
+    /**
+     * ConfiguratorFactory$Adaptive 对象
+     */
     private static final ConfiguratorFactory configuratorFactory = ExtensionLoader.getExtensionLoader(ConfiguratorFactory.class).getAdaptiveExtension();
+
+    // ========== 服务消费者相关 BEGIN ==========
+
+    /**
+     * 注册中心的服务类，目前是 com.alibaba.dubbo.registry.RegistryService
+     *
+     * 通过 {@link #url} 的 {@link URL#getServiceKey()} 获得
+     */
     private final String serviceKey; // Initialization at construction time, assertion not null
+
+    /**
+     * 服务类型，例如：com.alibaba.dubbo.demo.DemoService
+     */
     private final Class<T> serviceType; // Initialization at construction time, assertion not null
+
+    /**
+     * Consumer URL 的配置项 Map
+     */
     private final Map<String, String> queryMap; // Initialization at construction time, assertion not null
+
+    /**
+     * 原始的目录 URL
+     *
+     * 例如：zookeeper://127.0.0.1:2181/com.alibaba.dubbo.registry.RegistryService?application=demo-consumer&callbacks=1000&check=false&client=netty4&cluster=failback&dubbo=2.0.0&interface=com.alibaba.dubbo.demo.DemoService&methods=sayHello,callbackParam,save,update,say03,delete,say04,demo,say01,bye,say02,saves&payload=1000&pid=63400&qos.port=33333&register.ip=192.168.16.23&sayHello.async=true&side=consumer&timeout=10000&timestamp=1527056491064
+     */
     private final URL directoryUrl; // Initialization at construction time, assertion not null, and always assign non null value
+
+    /**
+     * 服务方法数组
+     */
     private final String[] serviceMethods;
+
+    /**
+     * 是否引用多分组
+     *
+     * 服务分组：http://dubbo.apache.org/zh-cn/docs/user/demos/service-group.html
+     */
     private final boolean multiGroup;
+
+    // ========== 注册中心相关 BEGIN ==========
+
+    /**
+     * 注册中心的 Protocol 对象
+     */
     private Protocol protocol; // Initialization at the time of injection, the assertion is not null
+
+    /**
+     * 注册中心
+     */
     private Registry registry; // Initialization at the time of injection, the assertion is not null
+
+    /**
+     * 是否禁止访问。
+     *
+     * 有两种情况会导致：
+     *
+     * 1. 没有服务提供者
+     * 2. 服务提供者被禁用
+     */
     private volatile boolean forbidden = false;
 
+    // ========== 配置规则相关 BEGIN ==========
+
+    /**
+     * 覆写的目录 URL ，结合配置规则
+     */
     private volatile URL overrideDirectoryUrl; // Initialization at construction time, assertion not null, and always assign non null value
 
     private volatile URL registeredConsumerUrl;
 
     /**
+     * 配置规则数组
      * override rules
      * Priority: override>-D>consumer>provider
      * Rule one: for a certain provider <ip:port,timeout=100>
@@ -88,12 +157,23 @@ public class RegistryDirectory<T> extends AbstractDirectory<T> implements Notify
      */
     private volatile List<Configurator> configurators; // The initial value is null and the midway may be assigned to null, please use the local variable reference
 
+    // ========== 服务提供者相关 BEGIN ==========
+
+    /**
+     * [url]与[服务提供者 Invoker 集合]的映射缓存
+     */
     // Map<url, Invoker> cache service url to invoker mapping.
     private volatile Map<String, Invoker<T>> urlInvokerMap; // The initial value is null and the midway may be assigned to null, please use the local variable reference
 
+    /**
+     * [方法名]与[服务提供者 Invoker 集合]的映射缓存
+     */
     // Map<methodName, Invoker> cache service method to invokers mapping.
     private volatile Map<String, List<Invoker<T>>> methodInvokerMap; // The initial value is null and the midway may be assigned to null, please use the local variable reference
 
+    /**
+     * [服务提供者 Invoker 集合]缓存
+     */
     // Set<invokerUrls> cache invokeUrls to invokers mapping.
     private volatile Set<URL> cachedInvokerUrls; // The initial value is null and the midway may be assigned to null, please use the local variable reference
 
@@ -105,10 +185,14 @@ public class RegistryDirectory<T> extends AbstractDirectory<T> implements Notify
             throw new IllegalArgumentException("registry serviceKey is null.");
         this.serviceType = serviceType;
         this.serviceKey = url.getServiceKey();
+        // 获得 queryMap
         this.queryMap = StringUtils.parseQueryString(url.getParameterAndDecoded(Constants.REFER_KEY));
+        // 获得 overrideDirectoryUrl 和 directoryUrl
         this.overrideDirectoryUrl = this.directoryUrl = url.setPath(url.getServiceInterface()).clearParameters().addParameters(queryMap).removeParameter(Constants.MONITOR_KEY);
+        // 初始化 multiGroup
         String group = directoryUrl.getParameter(Constants.GROUP_KEY, "");
         this.multiGroup = group != null && ("*".equals(group) || group.contains(","));
+        // 初始化 serviceMethods
         String methods = queryMap.get(Constants.METHODS_KEY);
         this.serviceMethods = methods == null ? null : Constants.COMMA_SPLIT_PATTERN.split(methods);
     }
@@ -156,8 +240,16 @@ public class RegistryDirectory<T> extends AbstractDirectory<T> implements Notify
         this.registry = registry;
     }
 
+    /**
+     * 向注册中心发起订阅。
+     * 服务消费者，再引用服务时，会创建 RegistryDirectory 对象，并发起1）服务提供者 + 2）路由规则 + 3）配置规则的数据订阅。
+     * {@link com.alibaba.dubbo.registry.integration.RegistryProtocol#doRefer}
+     * @param url
+     */
     public void subscribe(URL url) {
+        // 调用父 #setConsumerUrl(url) 方法，设置 consumerUrl 消费者 URL
         setConsumerUrl(url);
+        // 向注册中心，发起订阅
         registry.subscribe(url, this);
     }
 
@@ -192,10 +284,20 @@ public class RegistryDirectory<T> extends AbstractDirectory<T> implements Notify
         }
     }
 
+    /**
+     * 这是一个同步的方法。
+     * 在注册中心( Registry )发现数据发生变化时，会通知对应的 NotifyListener 们。
+     * {@link com.alibaba.dubbo.registry.support.AbstractRegistry#notify(URL url, NotifyListener listener, List<URL> urls)}
+     * @param urls
+     * */
     @Override
     public synchronized void notify(List<URL> urls) {
+        // 根据 URL 的分类或协议，分组成三个集合 。
+        // 服务提供者 URL 集合
         List<URL> invokerUrls = new ArrayList<URL>();
+        // 路由规则 URL 集合
         List<URL> routerUrls = new ArrayList<URL>();
+        // 配置规则 URL 集合
         List<URL> configuratorUrls = new ArrayList<URL>();
         for (URL url : urls) {
             String protocol = url.getProtocol();
@@ -212,17 +314,21 @@ public class RegistryDirectory<T> extends AbstractDirectory<T> implements Notify
                 logger.warn("Unsupported category " + category + " in notified url: " + url + " from registry " + getUrl().getAddress() + " to consumer " + NetUtils.getLocalHost());
             }
         }
+        // 处理配置规则 URL 集合
         // configurators
         if (configuratorUrls != null && !configuratorUrls.isEmpty()) {
             this.configurators = toConfigurators(configuratorUrls);
         }
+        // 处理路由规则 URL 集合
         // routers
         if (routerUrls != null && !routerUrls.isEmpty()) {
             List<Router> routers = toRouters(routerUrls);
             if (routers != null) { // null - do nothing
+                // 若转换到 routers 非空，调用父 #setRouters(routers) 方法，设置路由规则。
                 setRouters(routers);
             }
         }
+        // 合并配置规则，到 `directoryUrl` 中，形成 `overrideDirectoryUrl` 变量。
         List<Configurator> localConfigurators = this.configurators; // local reference
         // merge override parameters
         this.overrideDirectoryUrl = directoryUrl;
@@ -231,6 +337,7 @@ public class RegistryDirectory<T> extends AbstractDirectory<T> implements Notify
                 this.overrideDirectoryUrl = configurator.configure(overrideDirectoryUrl);
             }
         }
+        // 处理服务提供者 URL 集合
         // providers
         refreshInvoker(invokerUrls);
     }

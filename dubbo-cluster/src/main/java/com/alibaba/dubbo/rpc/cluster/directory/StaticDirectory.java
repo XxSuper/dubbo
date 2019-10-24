@@ -26,7 +26,7 @@ import java.util.List;
 
 /**
  * StaticDirectory
- *
+ * 静态 Directory 实现类，从命名上看出它是静态的 List<Invoker>
  */
 public class StaticDirectory<T> extends AbstractDirectory<T> {
 
