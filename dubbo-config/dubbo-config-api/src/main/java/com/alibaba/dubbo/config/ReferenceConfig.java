@@ -516,6 +516,8 @@ public class ReferenceConfig<T> extends AbstractReferenceConfig {
                 if (registryURL != null) { // registry url is available
                     // 对有注册中心的 Cluster 只用 AvailableCluster
                     // use AvailableCluster only when register's cluster is available
+                    // 当 registryURL 非空时，意味着有注册中心，使用 cluster=available 集群方式，并调用 Cluster$Adaptive#join(StaticDirectory) 方法，创建对应的 Cluster Invoker 对象。
+                    // 这意味着，服务调用时，因为使用的是 cluster=available ，仅调用第一个可用的 Invoker 对象。
                     URL u = registryURL.addParameter(Constants.CLUSTER_KEY, AvailableCluster.NAME);
                     invoker = cluster.join(new StaticDirectory(u, invokers));
                 // 无注册中心
