@@ -192,9 +192,13 @@ public class RegistryProtocol implements Protocol {
         // 使用 OverrideListener 对象，订阅配置规则
         // Subscribe the override data
         // FIXME When the provider subscribes, it will affect the scene : a certain JVM exposes the service and call the same service. Because the subscribed is cached key with the name of the service, it causes the subscription information to cover.
+        // 创建订阅配置规则的 URL
         final URL overrideSubscribeUrl = getSubscribedOverrideUrl(registeredProviderUrl);
+        // 创建 OverrideListener 对象，并添加到 `overrideListeners` 中
         final OverrideListener overrideSubscribeListener = new OverrideListener(overrideSubscribeUrl, originInvoker);
         overrideListeners.put(overrideSubscribeUrl, overrideSubscribeListener);
+        // 向注册中心，发起订阅
+        // 向注册中心注册 OverrideListener 监听器，订阅配置规则的变化。
         registry.subscribe(overrideSubscribeUrl, overrideSubscribeListener);
         //Ensure that a new exporter instance is returned every time export
         return new DestroyableExporter<T>(exporter, originInvoker, overrideSubscribeUrl, registeredProviderUrl);
@@ -237,17 +241,25 @@ public class RegistryProtocol implements Protocol {
     /**
      * Reexport the invoker of the modified url
      *
+     * 原来的 Exporter 不进行销毁么?实际上不需要，原因有两点：
+     * 1、每个协议初始化的 Server 有缓存 ，所以重新初始化，可以重用缓存中的 Server 。
+     * 2、如果销毁原有 Exporter ，会导致缓存的 Server 也一起销毁。而且，即使不销毁，原有 Exporter 也就是一个对象，可以被回收掉。
+     *
      * @param originInvoker
      * @param newInvokerUrl
      */
     @SuppressWarnings("unchecked")
     private <T> void doChangeLocalExport(final Invoker<T> originInvoker, URL newInvokerUrl) {
+        // 校验对应的 Exporter 是否存在。若不存在，打印告警日志。
         String key = getCacheKey(originInvoker);
         final ExporterChangeableWrapper<T> exporter = (ExporterChangeableWrapper<T>) bounds.get(key);
         if (exporter == null) {
             logger.warn(new IllegalStateException("error state, exporter should not be null"));
         } else {
+            // 创建 InvokerDelegete 对象
             final Invoker<T> invokerDelegete = new InvokerDelegete<T>(originInvoker, newInvokerUrl);
+            // 重新暴露 Invoker
+            // 设置到 ExporterChangeableWrapper 中
             exporter.setExporter(protocol.export(invokerDelegete));
         }
     }
@@ -306,6 +318,7 @@ public class RegistryProtocol implements Protocol {
     private URL getSubscribedOverrideUrl(URL registedProviderUrl) {
         return registedProviderUrl.setProtocol(Constants.PROVIDER_PROTOCOL)
                 .addParameters(Constants.CATEGORY_KEY, Constants.CONFIGURATORS_CATEGORY,
+                        // 订阅失败，不校验
                         Constants.CHECK_KEY, String.valueOf(false));
     }
 
@@ -458,10 +471,26 @@ public class RegistryProtocol implements Protocol {
      * 1.Ensure that the exporter returned by registryprotocol can be normal destroyed
      * 2.No need to re-register to the registry after notify
      * 3.The invoker passed by the export method , would better to be the invoker of exporter
+     *
+     * OverrideListener 是 RegistryProtocol 内部类，实现 NotifyListener 接口
+     * 重新 export ：protocol 中的 exporter destroy 问题
+     *
+     * 1. 要求 registry protocol 返回的 exporter 可以正常 destroy
+     * 2. notify 后不需要重新向注册中心注册
+     * 3. export 方法传入的 invoker 最好能一直作为 exporter 的 invoker.
+     *
+     *
      */
     private class OverrideListener implements NotifyListener {
 
+        /**
+         * 订阅 URL 对象
+         */
         private final URL subscribeUrl;
+
+        /**
+         * 原始 Invoker 对象
+         */
         private final Invoker originInvoker;
 
         public OverrideListener(URL subscribeUrl, Invoker originalInvoker) {
@@ -474,6 +503,7 @@ public class RegistryProtocol implements Protocol {
          */
         @Override
         public synchronized void notify(List<URL> urls) {
+            // 获得匹配的规则配置 URL 集合
             logger.debug("original override urls: " + urls);
             List<URL> matchedUrls = getMatchedUrls(urls, subscribeUrl);
             logger.debug("subscribe url: " + subscribeUrl + ", override urls: " + matchedUrls);
@@ -482,26 +512,37 @@ public class RegistryProtocol implements Protocol {
                 return;
             }
 
+            // 将配置规则 URL 集合，**转换**成对应的 Configurator 集合
             List<Configurator> configurators = RegistryDirectory.toConfigurators(matchedUrls);
 
+            // 获得真实的 Invoker 对象
             final Invoker<?> invoker;
             if (originInvoker instanceof InvokerDelegete) {
                 invoker = ((InvokerDelegete<?>) originInvoker).getInvoker();
             } else {
                 invoker = originInvoker;
             }
+
+            // 获得真实的 Invoker 的 URL 对象
             //The origin invoker
             URL originUrl = RegistryProtocol.this.getProviderUrl(invoker);
+
+            // 若对应的 Exporter 对象不存在
             String key = getCacheKey(originInvoker);
             ExporterChangeableWrapper<?> exporter = bounds.get(key);
             if (exporter == null) {
                 logger.warn(new IllegalStateException("error state, exporter should not be null"));
                 return;
             }
+
+            // 获得 Invoker 当前的 URL 对象，可能已经被之前的配置规则合并过
             //The current, may have been merged many times
             URL currentUrl = exporter.getInvoker().getUrl();
+
+            // 基于 originUrl 对象，合并配置规则，生成新的 newUrl 对象
             //Merged with this configuration
             URL newUrl = getConfigedInvokerUrl(configurators, originUrl);
+            // 判断新老 Url 不匹配，重新暴露 Invoker
             if (!currentUrl.equals(newUrl)) {
                 RegistryProtocol.this.doChangeLocalExport(originInvoker, newUrl);
                 logger.info("exported provider url changed, origin url: " + originUrl + ", old export url: " + currentUrl + ", new export url: " + newUrl);
@@ -519,6 +560,7 @@ public class RegistryProtocol implements Protocol {
                 }
 
                 // Check whether url is to be applied to the current service
+                // 进行判断是否匹配。
                 if (UrlUtils.isMatch(currentSubscribe, overrideUrl)) {
                     result.add(url);
                 }

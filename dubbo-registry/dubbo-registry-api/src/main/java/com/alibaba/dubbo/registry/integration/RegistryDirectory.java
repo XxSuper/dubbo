@@ -202,31 +202,49 @@ public class RegistryDirectory<T> extends AbstractDirectory<T> implements Notify
      * Convert override urls to map for use when re-refer.
      * Send all rules every time, the urls will be reassembled and calculated
      *
+     * 将overrideURL 转换为 map，供重新 refer 时使用.
+     * 每次下发全部规则，全部重新组装计算
+     *
      * @param urls Contract:
      *             </br>1.override://0.0.0.0/...( or override://ip:port...?anyhost=true)&para1=value1... means global rules (all of the providers take effect)
      *             </br>2.override://ip:port...?anyhost=false Special rules (only for a certain provider)
      *             </br>3.override:// rule is not supported... ,needs to be calculated by registry itself.
      *             </br>4.override://0.0.0.0/ without parameters means clearing the override
+     *
+     *  @param urls 契约：
+     *              </br>1.override://0.0.0.0/...(或override://ip:port...?anyhost=true)&para1=value1...表示全局规则(对所有的提供者全部生效)
+     *              </br>2.override://ip:port...?anyhost=false 特例规则（只针对某个提供者生效）
+     *              </br>3.不支持override://规则... 需要注册中心自行计算.
+     *              </br>4.不带参数的override://0.0.0.0/ 表示清除override
+     *
+     *  将配置规则 URL 集合，转换成对应的 Configurator 集合。
+     *
      * @return
      */
     public static List<Configurator> toConfigurators(List<URL> urls) {
+        // 若配置规则 URL 集合为空
         if (urls == null || urls.isEmpty()) {
             return Collections.emptyList();
         }
 
+        // 创建 Configurator 集合
         List<Configurator> configurators = new ArrayList<Configurator>(urls.size());
         for (URL url : urls) {
+            // 若协议为 `empty://` ，意味着清空所有配置规则，因此返回空 Configurator 集合
             if (Constants.EMPTY_PROTOCOL.equals(url.getProtocol())) {
                 configurators.clear();
                 break;
             }
+            // 对应第 4 条契约，不带参数的 override://0.0.0.0/ 表示清除 override
             Map<String, String> override = new HashMap<String, String>(url.getParameters());
             //The anyhost parameter of override may be added automatically, it can't change the judgement of changing url
+            // override 上的 anyhost 可能是自动添加的，不能影响改变url判断
             override.remove(Constants.ANYHOST_KEY);
             if (override.size() == 0) {
                 configurators.clear();
                 continue;
             }
+            // 获得 Configurator 对象，并添加到 `configurators` 中
             configurators.add(configuratorFactory.getConfigurator(url));
         }
         Collections.sort(configurators);
@@ -601,6 +619,7 @@ public class RegistryDirectory<T> extends AbstractDirectory<T> implements Notify
         // 合并配置规则
         List<Configurator> localConfigurators = this.configurators; // local reference
         if (localConfigurators != null && !localConfigurators.isEmpty()) {
+            // 循环 configurators 集合，调用 Configurator#configure(URL url) 方法，合并配置规则到 providerUrl 中。
             for (Configurator configurator : localConfigurators) {
                 providerUrl = configurator.configure(providerUrl);
             }
